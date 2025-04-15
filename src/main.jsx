@@ -13,6 +13,7 @@ import DetailsPage from './pages/DetailsPage.jsx'
 import { AuthProvider } from './context/authProvider.jsx'
 import WatchList from './pages/WatchList.jsx'
 import Protected from './components/routes/Protected.jsx'
+import Watched from './pages/Watched.jsx'
 
 localStorage.setItem('chakra-ui-color-mode', 'dark')
 
@@ -38,8 +39,8 @@ const router = createBrowserRouter([
         element: <DetailsPage />,
       },
       {
-        path: "/wishlist",
-        element: <div>Wishlist</div>,
+        path: "/watched",
+        element: <Protected><Watched/></Protected>,
       },
       {
         path: "/watchlist",

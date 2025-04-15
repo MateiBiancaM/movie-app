@@ -14,7 +14,7 @@ const DetailsPage = () => {
     const { type, id } = router;
     const { user } = useAuth();
     const toast = useToast();
-    const { addToWatchlist, checkIfInWatchlist , removeFromWatchlist} = useFirestore();
+    const { addToWatchlist, checkIfInWatchlist, removeFromWatchlist, addToWatched, checkIfWatched, removeFromWatched } = useFirestore();
 
     const [details, setDetails] = useState({});
     const [cast, setCast] = useState([]);
@@ -22,6 +22,8 @@ const DetailsPage = () => {
     const [videos, setVideos] = useState([])
     const [loading, setLoading] = useState(true);
     const [isInWatchlist, setIsInWatchlist] = useState(false);
+    const [isInWatched, setIsInWatched] = useState(false);
+
 
     useEffect(() => {
         const fetchData = async () => {
@@ -76,23 +78,62 @@ const DetailsPage = () => {
 
     }
 
-    const handleRemoveFromWatchlist= async ()=>{
+    const handleRemoveFromWatchlist = async () => {
         await removeFromWatchlist(user?.uid, id);
         const isSetToWatchlist = await checkIfInWatchlist(user?.uid, id);
         setIsInWatchlist(isSetToWatchlist);
     }
 
+    const handleAddToWatched = async () => {
+        if (!user) {
+            toast({
+                title: "Login to mark as watched",
+                status: "error",
+                isClosable: true,
+            });
+            return;
+        }
+
+        const data = {
+            id: details?.id,
+            title: details?.title || details?.name,
+            type: type,
+            poster_path: details?.poster_path,
+            release_date: details?.release_date || details?.first_air_date,
+            vote_average: details?.vote_average,
+            overview: details?.overview,
+        };
+
+        const dataId = details?.id?.toString();
+        await addToWatched(user?.uid, dataId, data);
+        const isSet = await checkIfWatched(user?.uid, dataId);
+        setIsInWatched(isSet);
+    };
+
+    const handleRemoveFromWatched = async () => {
+        await removeFromWatched(user?.uid, id);
+        const isSet = await checkIfWatched(user?.uid, id);
+        setIsInWatched(isSet);
+    };
+
+
     useEffect(() => {
-      if(!user){
-        setIsInWatchlist(false);
-        return; 
-      }
-      checkIfInWatchlist(user?.uid, id).then((data)=>{
-        setIsInWatchlist(data);
-      })
-    
-    }, [id,user,checkIfInWatchlist])
-    
+        if (!user) {
+            setIsInWatchlist(false);
+            setIsInWatched(false);
+            return;
+        }
+
+        checkIfInWatchlist(user?.uid, id).then((data) => {
+            setIsInWatchlist(data);
+        });
+
+        checkIfWatched(user?.uid, id).then((data) => {
+            setIsInWatched(data);
+        });
+    }, [id, user, checkIfInWatchlist, checkIfWatched]);
+
+
 
     if (loading) {
         return (
@@ -188,6 +229,27 @@ const DetailsPage = () => {
                                         Add to watchlist
                                     </Button>
                                 )}
+
+                                {isInWatched ? (
+                                    <Button
+                                        leftIcon={<CheckCircleIcon />}
+                                        colorScheme="green"
+                                        variant={"outline"}
+                                        onClick={handleRemoveFromWatched}
+                                    >
+                                        In watched
+                                    </Button>
+
+                                ) : (
+                                    <Button
+                                        leftIcon={<SmallAddIcon />}
+                                        variant={"outline"}
+                                        onClick={handleAddToWatched}
+                                    >
+                                        Add to watched
+                                    </Button>
+                                )}
+
 
 
                             </Flex>

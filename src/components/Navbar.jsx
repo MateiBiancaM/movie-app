@@ -51,6 +51,9 @@ const Navbar = () => {
                   <Link to="/watchlist">
                     <MenuItem>Watchlist</MenuItem>
                   </Link>
+                  <Link to="/watched">
+                    <MenuItem>Watched</MenuItem>
+                  </Link>
                   <MenuItem onClick={logout}>Logout</MenuItem>
                 </MenuList>
               </Menu>
@@ -101,6 +104,7 @@ const Navbar = () => {
                     {user && (
                       <>
                         <Link to="/watchlist">Watchlist</Link>
+                        <Link to="/watched">Watched</Link>
                         <Button
                           variant={"outline"}
                           colorScheme="red"
