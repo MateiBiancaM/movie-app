@@ -54,6 +54,15 @@ const Navbar = () => {
                   <Link to="/watched">
                     <MenuItem>Watched</MenuItem>
                   </Link>
+                  <Link to="/consumption">
+                    <MenuItem>Consumption Habits</MenuItem>
+                  </Link>
+                  <Link to="/financial">
+                    <MenuItem>Financial Reports</MenuItem>
+                  </Link>
+                  <Link to="/recommendations">
+                    <MenuItem>Recommendations</MenuItem>
+                  </Link>
                   <MenuItem onClick={logout}>Logout</MenuItem>
                 </MenuList>
               </Menu>
@@ -105,6 +114,9 @@ const Navbar = () => {
                       <>
                         <Link to="/watchlist">Watchlist</Link>
                         <Link to="/watched">Watched</Link>
+                        <Link to="/consumption">Consumption Habits</Link>
+                        <Link to="/financial">Financial Reports</Link>
+                        <Link to="/recommendations">Recommendations</Link>
                         <Button
                           variant={"outline"}
                           colorScheme="red"

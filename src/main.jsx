@@ -14,6 +14,7 @@ import { AuthProvider } from './context/authProvider.jsx'
 import WatchList from './pages/WatchList.jsx'
 import Protected from './components/routes/Protected.jsx'
 import Watched from './pages/Watched.jsx'
+import WatchedEdit from './pages/WatchedEdit.jsx'
 
 localStorage.setItem('chakra-ui-color-mode', 'dark')
 
@@ -43,6 +44,10 @@ const router = createBrowserRouter([
         element: <Protected><Watched/></Protected>,
       },
       {
+        path: "/watched/:id/edit",
+        element: <Protected><WatchedEdit/></Protected>,
+      },
+      {
         path: "/watchlist",
         element: <Protected><WatchList/></Protected>,
       },
@@ -52,11 +57,15 @@ const router = createBrowserRouter([
       },
       {
         path: "/financial",
-        element: <div>Financial</div>,
+        element: <Protected><div>Financial Reports</div></Protected>,
       },
       {
         path: "/consumption",
-        element: <div>Consumption</div>,
+        element: <Protected><div>Consumption Habits</div></Protected>,
+      },
+      {
+        path: "/recommendations",
+        element: <Protected><div>Recommendations</div></Protected>,
       },
       {
         path: "/search",

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useFirestore } from "../services/firestore";
 import { useAuth } from "../context/useAuth";
-import { Container, Flex, Grid, Heading, Spinner } from "@chakra-ui/react";
+import { Container, Flex, Grid, Heading, Select, Spinner } from "@chakra-ui/react";
 import WatchedCard from "../components/WatchedCard";
 
 const Watched = () => {
@@ -9,6 +9,8 @@ const Watched = () => {
   const { user } = useAuth();
   const [watched, setWatched] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [filter, setFilter] = useState("all");
+
 
   useEffect(() => {
     if (user?.uid) {
@@ -18,6 +20,11 @@ const Watched = () => {
         .finally(() => setIsLoading(false));
     }
   }, [user?.uid, getWatched]);
+  
+  const filteredWatched =
+  filter === "favorite"
+    ? watched.filter((item) => item.favorite)
+    : watched;
 
   return (
     <Container maxW="container.xl">
@@ -25,6 +32,14 @@ const Watched = () => {
         <Heading as="h2" fontSize="md" textTransform="uppercase">
           Watched
         </Heading>
+        <Select
+          w="130px"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        >
+          <option value="all">All</option>
+          <option value="favorite">Favorites</option>
+        </Select>
       </Flex>
 
       {isLoading && (
@@ -33,17 +48,19 @@ const Watched = () => {
         </Flex>
       )}
 
-      {!isLoading && watched.length === 0 && (
+      {!isLoading && filteredWatched.length === 0 && (
         <Flex justify="center" mt="10">
           <Heading as="h2" fontSize="md" textTransform="uppercase">
-            No watched movies yet.
+            {filter === "favorite"
+              ? "No favorites yet."
+              : "No watched movies yet."}
           </Heading>
         </Flex>
       )}
 
-      {!isLoading && watched.length > 0 && (
-        <Grid templateColumns={{ base: "1fr"}} gap="4">
-          {watched.map((item) => (
+{!isLoading && filteredWatched.length > 0 && (
+        <Grid templateColumns={{ base: "1fr" }} gap="4">
+          {filteredWatched.map((item) => (
             <WatchedCard
               key={item.id}
               item={item}

@@ -34,6 +34,8 @@ const DetailsPage = () => {
                     fetchVideos(type, id),
                 ])
 
+                console.log("Detail Data:", detailData);
+
                 setDetails(detailData);
                 setCast(creditsData?.cast?.slice(0, 10));
 
@@ -43,7 +45,7 @@ const DetailsPage = () => {
                 setVideos(videos)
 
             } catch (error) {
-                console.log(error, "err");
+                console.error("Error fetching data:", error);
             } finally {
                 setLoading(false);
             }
@@ -60,6 +62,7 @@ const DetailsPage = () => {
             });
             return;
         }
+
         const data = {
             id: details?.id,
             title: details?.title || details?.name,
@@ -68,8 +71,7 @@ const DetailsPage = () => {
             release_date: details?.release_date || details?.first_air_date,
             vote_average: details?.vote_average,
             overview: details?.overview,
-
-        }
+        };
 
         const dataId = details?.id?.toString();
         await addToWatchlist(user?.uid, dataId, data);
@@ -93,16 +95,24 @@ const DetailsPage = () => {
             });
             return;
         }
-
-        const data = {
-            id: details?.id,
-            title: details?.title || details?.name,
-            type: type,
-            poster_path: details?.poster_path,
-            release_date: details?.release_date || details?.first_air_date,
-            vote_average: details?.vote_average,
+        const isTV = type === 'tv';
+        const data = { 
+            id: details?.id, 
+            title: details?.title || details?.name, 
+            type: type, 
+            poster_path: details?.poster_path, 
+            release_date: details?.release_date || details?.first_air_date, 
+            vote_average: details?.vote_average, 
+            genres: details?.genres?.map(g => g.name), 
+            popularity: details?.popularity, 
             overview: details?.overview,
-        };
+            status: details?.status, 
+            ...(isTV && { 
+                number_of_episodes: details?.number_of_episodes, 
+                number_of_seasons: details?.number_of_seasons, 
+                episode_run_time: details?.episode_run_time?.[0], 
+            }) 
+        }; 
 
         const dataId = details?.id?.toString();
         await addToWatched(user?.uid, dataId, data);
