@@ -117,6 +117,7 @@ const Navbar = () => {
                         <Link to="/consumption">Consumption Habits</Link>
                         <Link to="/financial">Financial Reports</Link>
                         <Link to="/recommendations">Recommendations</Link>
+                        <Link to="/consumption">Consumption Habits</Link>
                         <Button
                           variant={"outline"}
                           colorScheme="red"

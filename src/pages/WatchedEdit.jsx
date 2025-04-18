@@ -9,32 +9,35 @@ import {
   Text,
   Center,
   Image,
+  Container,
+  Flex,
+  Grid,
+  CircularProgress,
+  CircularProgressLabel,
+  Spinner,
 } from "@chakra-ui/react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/useAuth";
 import { db } from "../services/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { StarIcon, AddIcon, DeleteIcon } from "@chakra-ui/icons";
+import { StarIcon, AddIcon, DeleteIcon, TimeIcon } from "@chakra-ui/icons";
 import { imagePath } from "../services/api";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-
 
 const WatchedEdit = () => {
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [movie, setMovie] = useState(null);
-
   const [rating, setRating] = useState(0);
   const [notesList, setNotesList] = useState([]);
   const [newNote, setNewNote] = useState("");
   const [quotesList, setQuotesList] = useState([]);
   const [newQuote, setNewQuote] = useState("");
   const [favorite, setFavorite] = useState(false);
-  const [watchDate, setWatchDate] = useState(null);
-
+  const [watchDate, setWatchDate] = useState(new Date());
 
   useEffect(() => {
     if (!user) return;
@@ -50,7 +53,6 @@ const WatchedEdit = () => {
         setQuotesList(data.quotes || []);
         setFavorite(data.favorite || false);
         setWatchDate(data.watchDate ? new Date(data.watchDate) : null);
-
       }
     };
 
@@ -97,7 +99,7 @@ const WatchedEdit = () => {
   if (!movie) return <Box p="4">Loading...</Box>;
 
   return (
-    <Box p="6" maxW="600px" mx="auto">
+    <Container maxW="container.xl">
       <Center flexDirection="column" mb="8">
         <Image
           src={`${imagePath}/${movie.poster_path}`}
@@ -229,30 +231,25 @@ const WatchedEdit = () => {
           ))}
         </VStack>
       </Box>
-      <Box>
-        <Heading size="md" mb="3">Select watch date</Heading>
+
+      {/* Watch Date Section */}
+      <Box mb="6">
+        <Heading size="md" mb="3">Watch Date</Heading>
         <DatePicker
           selected={watchDate}
           onChange={(date) => setWatchDate(date)}
-          dateFormat="dd.MM.yyyy"
-          placeholderText="Choose a date"
+          dateFormat="dd/MM/yyyy"
           maxDate={new Date()}
-          calendarStartDay={1} // Monday
           customInput={
-            <Input
-              bg="gray.700"
-              color="white"
-              _placeholder={{ color: "gray.400" }}
-            />
+            <Input />
           }
         />
       </Box>
 
-
       <Button mt="6" colorScheme="green" onClick={handleSave}>
         Save
       </Button>
-    </Box>
+    </Container>
   );
 };
 

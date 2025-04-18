@@ -17,3 +17,10 @@ export const minutesToHours=(minutes)=>{
     const mins=minutes%60;
     return `${hours}h ${mins}m`;
 }
+
+export const minutesToDaysHours=(minutes)=>{
+    const days=Math.floor(minutes/(24*60));
+    const hours=Math.floor((minutes%(24*60))/60);
+    const mins=minutes%(24*60)%60;
+    return `${days}d ${hours}h ${mins}m`;
+}

@@ -7,6 +7,8 @@ import { minutesToHours, ratingToProcentage, resolveRatingColor } from "../utils
 import VideoComponent from "../components/VideoComponent";
 import { useAuth } from "../context/useAuth";
 import { useFirestore } from '../services/firestore';
+import { useNavigate } from "react-router-dom";
+
 
 
 const DetailsPage = () => {
@@ -23,7 +25,7 @@ const DetailsPage = () => {
     const [loading, setLoading] = useState(true);
     const [isInWatchlist, setIsInWatchlist] = useState(false);
     const [isInWatched, setIsInWatched] = useState(false);
-
+    const navigate = useNavigate();
 
     useEffect(() => {
         const fetchData = async () => {
@@ -106,7 +108,10 @@ const DetailsPage = () => {
             genres: details?.genres?.map(g => g.name), 
             popularity: details?.popularity, 
             overview: details?.overview,
-            status: details?.status, 
+            status: details?.status,
+            ...(type === 'movie' && {
+                runtime: details?.runtime
+            }),
             ...(isTV && { 
                 number_of_episodes: details?.number_of_episodes, 
                 number_of_seasons: details?.number_of_seasons, 
@@ -118,6 +123,8 @@ const DetailsPage = () => {
         await addToWatched(user?.uid, dataId, data);
         const isSet = await checkIfWatched(user?.uid, dataId);
         setIsInWatched(isSet);
+        
+        navigate(`/watched/${data.id}/edit`);
     };
 
     const handleRemoveFromWatched = async () => {
