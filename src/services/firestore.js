@@ -146,6 +146,40 @@ export const useFirestore = () => {
     };
 
 
+    const saveDocument = async (col1, doc1, col2, doc2, data) => {
+        try {
+            const docRef = doc(db, col1, doc1, col2, doc2);
+            await setDoc(docRef, data);
+            console.log("✅ Document saved at:", docRef.path);
+        } catch (error) {
+            console.error("❌ Error saving document:", error);
+            toast({
+                title: "Eroare",
+                description: "Nu s-a putut salva în baza de date.",
+                status: 'error',
+                isClosable: true
+            });
+        }
+    };
+
+    const getDocument = async (col1, doc1, col2, doc2) => {
+        try {
+            const docRef = doc(db, col1, doc1, col2, doc2);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                return docSnap.data();
+            } else {
+                console.warn("⚠️ Document not found:", docRef.path);
+                return null;
+            }
+        } catch (error) {
+            console.error("❌ Error reading document:", error);
+            return null;
+        }
+    };
+    
+    
+
 
     return {
         addDocument,
@@ -158,6 +192,9 @@ export const useFirestore = () => {
         removeFromWatched,
         getWatched,
         checkIfWatched,
+
+        saveDocument,
+        getDocument,
     };
 };
 
