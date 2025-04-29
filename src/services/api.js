@@ -53,5 +53,29 @@ export const searchData = async (querry,page) => {
     return res?.data;
 }
 
+export const getGenreMap = async () => {
+    try {
+      const [movieGenres, tvGenres] = await Promise.all([
+        axios.get(`${baseUrl}/genre/movie/list?api_key=${apiKey}`),
+        axios.get(`${baseUrl}/genre/tv/list?api_key=${apiKey}`),
+      ]);
+  
+      const allGenres = [
+        ...(movieGenres?.data?.genres || []),
+        ...(tvGenres?.data?.genres || []),
+      ];
+  
+      const genreMap = {};
+      allGenres.forEach((genre) => {
+        genreMap[genre.id] = genre.name;
+      });
+  
+      return genreMap; // Ex: {28: "Action", 12: "Adventure", ...}
+    } catch (error) {
+      console.error("Failed to fetch genres:", error);
+      return {};
+    }
+  };
+
 
 

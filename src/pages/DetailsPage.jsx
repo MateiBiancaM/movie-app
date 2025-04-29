@@ -107,7 +107,8 @@ const DetailsPage = () => {
             vote_average: details?.vote_average, 
             genres: details?.genres?.map(g => g.name), 
             popularity: details?.popularity, 
-            overview: details?.overview,
+            // overview: details?.overview,
+            description: details?.overview,
             status: details?.status,
             ...(type === 'movie' && {
                 runtime: details?.runtime

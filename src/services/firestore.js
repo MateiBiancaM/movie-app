@@ -3,6 +3,7 @@ import { db } from '../services/firebase';
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
 import { useCallback } from 'react';
 
+
 export const useFirestore = () => {
     const toast = useToast();
 
@@ -177,6 +178,8 @@ export const useFirestore = () => {
             return null;
         }
     };
+
+    
     
     
 

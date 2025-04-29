@@ -17,6 +17,7 @@ import Watched from './pages/Watched.jsx'
 import WatchedEdit from './pages/WatchedEdit.jsx'
 import ConsumptionHabits from './pages/ConsumptionHabits.jsx'
 import FinancialReports from './pages/FinancialReports.jsx'
+import Recommendations from './pages/Recommendations.jsx'
 
 localStorage.setItem('chakra-ui-color-mode', 'dark')
 
@@ -63,7 +64,7 @@ const router = createBrowserRouter([
       },
       {
         path: "/recommendations",
-        element: <Protected><div>Recommendations</div></Protected>,
+        element: <Protected><Recommendations/></Protected>,
       },
       {
         path: "/search",

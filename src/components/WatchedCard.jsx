@@ -87,7 +87,7 @@ const WatchedCard = ({ type, item, setWatched }) => {
                     </Text>
                 </Flex>
                 <Text mt="4" fontSize={{ base: "xs", md: "sm" }} noOfLines={5}>
-                    {item?.overview}
+                    {item?.description}
                 </Text>
                 <Box mt="4">
                     <Button
