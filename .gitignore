@@ -25,3 +25,6 @@ dist-ssr
 
 #env
 .env
+
+# Python virtual environment
+src/server_recommendations/venv/

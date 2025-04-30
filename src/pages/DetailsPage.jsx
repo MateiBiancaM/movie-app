@@ -20,6 +20,7 @@ const DetailsPage = () => {
 
     const [details, setDetails] = useState({});
     const [cast, setCast] = useState([]);
+    const [crew, setCrew] = useState([]);
     const [video, setVideo] = useState(null)
     const [videos, setVideos] = useState([])
     const [loading, setLoading] = useState(true);
@@ -37,9 +38,15 @@ const DetailsPage = () => {
                 ])
 
                 console.log("Detail Data:", detailData);
+                console.log("Credits Data:", creditsData);
+                console.log("Videos Data:", videosData);
 
                 setDetails(detailData);
                 setCast(creditsData?.cast?.slice(0, 10));
+
+                const directors = creditsData?.crew?.filter(c => c.job === "Director") || [];
+                setCrew(directors);
+
 
                 const video = videosData?.results?.find((video) => video?.type === "Trailer");
                 setVideo(video);
@@ -98,33 +105,37 @@ const DetailsPage = () => {
             return;
         }
         const isTV = type === 'tv';
-        const data = { 
-            id: details?.id, 
-            title: details?.title || details?.name, 
-            type: type, 
-            poster_path: details?.poster_path, 
-            release_date: details?.release_date || details?.first_air_date, 
-            vote_average: details?.vote_average, 
-            genres: details?.genres?.map(g => g.name), 
-            popularity: details?.popularity, 
+        const castNames = cast.map(c => c.name?.replace(/\s+/g, "")).slice(0, 3);
+        const directorNames = crew.map(c => c.name?.replace(/\s+/g, "")).slice(0, 2);
+        const data = {
+            id: details?.id,
+            title: details?.title || details?.name,
+            type: type,
+            poster_path: details?.poster_path,
+            release_date: details?.release_date || details?.first_air_date,
+            vote_average: details?.vote_average,
+            genres: details?.genres?.map(g => g.name),
+            popularity: details?.popularity,
             // overview: details?.overview,
             description: details?.overview,
+            cast: castNames,
+            crew: directorNames,
             status: details?.status,
             ...(type === 'movie' && {
                 runtime: details?.runtime
             }),
-            ...(isTV && { 
-                number_of_episodes: details?.number_of_episodes, 
-                number_of_seasons: details?.number_of_seasons, 
-                episode_run_time: details?.episode_run_time?.[0], 
-            }) 
-        }; 
+            ...(isTV && {
+                number_of_episodes: details?.number_of_episodes,
+                number_of_seasons: details?.number_of_seasons,
+                episode_run_time: details?.episode_run_time?.[0],
+            })
+        };
 
         const dataId = details?.id?.toString();
         await addToWatched(user?.uid, dataId, data);
         const isSet = await checkIfWatched(user?.uid, dataId);
         setIsInWatched(isSet);
-        
+
         navigate(`/watched/${data.id}/edit`);
     };
 
