@@ -127,7 +127,7 @@ const DetailsPage = () => {
             ...(isTV && {
                 number_of_episodes: details?.number_of_episodes,
                 number_of_seasons: details?.number_of_seasons,
-                episode_run_time: details?.episode_run_time?.[0],
+                episode_run_time: details?.episode_run_time?.[0] ?? null,
             })
         };
 

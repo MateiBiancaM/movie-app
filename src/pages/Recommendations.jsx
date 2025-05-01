@@ -1,117 +1,139 @@
 import { useEffect, useState } from "react";
-import { Container, Flex, Grid, Heading, Skeleton, Text } from "@chakra-ui/react";
-import { useAuth } from "../context/useAuth";
-import { useFirestore } from "../services/firestore";
 import {
-  fetchMovies,
-  fetchTvSeries,
-  getGenreMap,
-  fetchCredits
+  Container,
+  Flex,
+  Grid,
+  Heading,
+  Select,
+  Spinner,
+} from "@chakra-ui/react";
+import { useFirestore } from "../services/firestore";
+import { useAuth } from "../context/useAuth";
+import {
+  fetchCredits,
+  fetchMoviesBulk,
+  fetchTvSeriesBulk,
 } from "../services/api";
 import axios from "axios";
 import CardComponent from "../components/CardComponent";
 
 const Recommendations = () => {
-  const { user } = useAuth();
   const { getWatched } = useFirestore();
-
-  const [recommendations, setRecommendations] = useState([]);
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
+  const [filter, setFilter] = useState("general"); // general | individual
+
+  const [general, setGeneral] = useState([]);
+  const [individual, setIndividual] = useState([]);
 
   useEffect(() => {
-    const fetchRecommendations = async () => {
+    const loadRecommendations = async () => {
       if (!user?.uid) return;
-      setIsLoading(true);
 
       try {
+        setIsLoading(true);
+
         const watched = await getWatched(user.uid);
-        const genreMap = await getGenreMap();
+        const favorites = watched
+          .filter((item) => item.favorite)
+          .sort((a, b) => new Date(b.watchDate) - new Date(a.watchDate))
+          .slice(0, 5);
 
-        const fetchAllPages = async (fetchFn, sortBy) => {
-          const results = [];
-          const maxPages = 3; // Redus pt. performanță când adaugi credits
-          for (let page = 1; page <= maxPages; page++) {
-            const res = await fetchFn(page, sortBy);
-            results.push(...(res?.results || []));
-          }
-          return results;
-        };
+        const favoritesWithTags = await Promise.all(
+          favorites.map(async (item) => {
+            const credits = await fetchCredits(item.type, item.id);
+            const tags = [
+              ...(item.overview?.split(" ") || []),
+              ...(item.genre_ids || []),
+              ...(credits.cast?.slice(0, 5).map((a) => a.name) || []),
+              ...(credits.crew?.slice(0, 3).map((p) => p.job + " " + p.name) || []),
+            ].join(" ");
 
-        const [popularMovies, topRatedMovies] = await Promise.all([
-          fetchAllPages(fetchMovies, "popularity.desc"),
-          fetchAllPages(fetchTvSeries, "popularity.desc"),
-        ]);
-
-        const allRawItems = [...popularMovies, ...topRatedMovies];
-
-        const uniqueItems = allRawItems.filter(
-          (item, index, self) => index === self.findIndex((i) => i.id === item.id)
+            return {
+              id: item.id,
+              title: item.title || item.name,
+              tags,
+              poster_path: item.poster_path,
+              release_date: item.release_date || item.first_air_date,
+              vote_average: item.vote_average,
+              type: item.type || (item.name ? "tv" : "movie")
+            };
+          })
         );
 
-        // ✅ Extragem credits pentru primele 100 filme/seriale
-        const topItems = uniqueItems.slice(0, 100);
+        const [moviesRes, seriesRes] = await Promise.all([
+          fetchMoviesBulk(6), // poți crește dacă vrei
+          fetchTvSeriesBulk(6),
+        ]);
 
-        const sanitize = async (item) => {
-          const credits = await fetchCredits(item.media_type || (item.title ? "movie" : "tv"), item.id);
+        const discoverItems = [...moviesRes.results, ...seriesRes.results];
+        console.log("Total:", discoverItems.length);
 
-          const topCast = credits?.cast?.slice(0, 3)?.map(actor =>
-            actor?.name?.replace(/\s/g, "") || ""
-          ) || [];
+        const discoverWithTags = await Promise.all(
+          discoverItems.map(async (item) => {
+            const type = item.media_type || (item.name ? "tv" : "movie");
+            const credits = await fetchCredits(type, item.id);
+            const tags = [
+              ...(item.overview?.split(" ") || []),
+              ...(item.genre_ids || []),
+              ...(credits.cast?.slice(0, 5).map((a) => a.name) || []),
+              ...(credits.crew?.slice(0, 3).map((p) => p.job + " " + p.name) || []),
+            ].join(" ");
 
-          const directors = credits?.crew
-            ?.filter(person => person.job === "Director")
-            ?.slice(0, 1)
-            ?.map(director => director?.name?.replace(/\s/g, "")) || [];
+            return {
+              id: item.id,
+              title: item.title || item.name,
+              tags,
+              poster_path: item.poster_path,
+              release_date: item.release_date || item.first_air_date,
+              vote_average: item.vote_average,
+              type: item.type || (item.name ? "tv" : "movie")
+            };
+          })
+        );
 
-          return {
-            id: item.id,
-            title: item.title || item.name || "Untitled",
-            overview: item.overview || "",
-            genres: item.genre_ids?.map(id => genreMap[id]) || [],
-            cast: topCast,
-            crew: directors,
-            poster_path: item.poster_path || "",
-            vote_average: item.vote_average || 0,
-            media_type: item.media_type || (item.title ? "movie" : "tv"),
-          };
-        };
+        //Filtrăm doar filme complete
+        const cleanedFavorites = favoritesWithTags.filter(
+          (m) =>
+            m.id &&
+            m.title &&
+            m.tags &&
+            m.poster_path &&
+            m.release_date &&
+            typeof m.vote_average === "number"
+        );
 
-        const allMovies = await Promise.all(topItems.map(sanitize));
+        const cleanedDiscover = discoverWithTags.filter(
+          (m) =>
+            m.id &&
+            m.title &&
+            m.tags &&
+            m.poster_path &&
+            m.release_date &&
+            typeof m.vote_average === "number"
+        );
 
-        const watchedSanitized = watched.map((item) => ({
-          id: item.id,
-          title: item.title || item.name || "Untitled",
-          overview: item.description || item.overview || "",
-          genres: item.genres || [],
-          cast: item.cast || [],
-          crew: item.crew || [],
-          poster_path: item.poster_path || "",
-          vote_average: item.vote_average || 0,
-          media_type: item.media_type || item.type || "movie",
-          rating: item.rating || 5,
-          is_favorite: item.is_favorite || false,
-        }));
-
-        const response = await axios.post("http://127.0.0.1:8001/recommend", {
-          watched: watchedSanitized,
-          all_movies: allMovies,
+        console.log("📦 Trimitem la backend:", {
+          favorites: cleanedFavorites.length,
+          discover: cleanedDiscover.length,
         });
 
-        
-        console.log("🎬 Watched sanitized:", watchedSanitized);
-        console.log("📦 All movies with credits:", allMovies);
+        const res = await axios.post("http://localhost:8001/recommend", {
+          favorites: cleanedFavorites,
+          discover: cleanedDiscover,
+        });
 
-        setRecommendations(response.data);
-
+        setGeneral(res.data.general);
+        setIndividual(res.data.individual);
       } catch (err) {
-        console.error("Failed to fetch recommendations:", err);
+        console.error("Eroare la recomandări:", err);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchRecommendations();
-  }, [user?.uid]);
+    loadRecommendations();
+  }, [user]);
 
   return (
     <Container maxW="container.xl">
@@ -119,30 +141,67 @@ const Recommendations = () => {
         <Heading as="h2" fontSize="md" textTransform="uppercase">
           Recommendations
         </Heading>
+        <Select
+          w="270px"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        >
+          <option value="general">General Recommendations</option>
+          <option value="individual">Individual Recommendations</option>
+        </Select>
       </Flex>
 
-      <Grid
-        templateColumns={{
-          base: "1fr",
-          sm: "repeat(2, 1fr)",
-          md: "repeat(4, 1fr)",
-          lg: "repeat(5, 1fr)",
-        }}
-        gap="4"
-      >
-        {isLoading
-          ? Array.from({ length: 10 }).map((_, i) => <Skeleton height="300px" key={i} />)
-          : recommendations.length === 0
-          ? <Text>No recommendations found.</Text>
-          : recommendations.map((item) => (
-              <CardComponent
-                key={`${item.id}-${item.media_type}`}
-                item={item}
-                type={item.media_type}
-                similarity={item.similarity}
-              />
+      {isLoading ? (
+        <Flex justify="center" mt="10">
+          <Spinner size="xl" color="green.400" />
+        </Flex>
+      ) : (
+        <>
+          {filter === "general" && (
+            <>
+              <Heading as="h3" size="md" mb="6">
+                General recommendations (Top 20)
+              </Heading>
+              <Grid
+                templateColumns={{
+                  base: "1fr",
+                  sm: "repeat(2, 1fr)",
+                  md: "repeat(4, 1fr)",
+                  lg: "repeat(5, 1fr)",
+                }}
+                gap={4}
+              >
+                {general.map((item) => (
+                 <CardComponent key={`general-${item.type}-${item.id}`} item={item} type={item.type} />
+                ))}
+              </Grid>
+            </>
+          )}
+
+          {filter === "individual" &&
+            individual.map((group, index) => (
+              <div key={index}>
+                <Heading as="h3" size="sm" my={4}>
+                 Because you liked <strong>{group.based_on}</strong>, we recommend:
+                </Heading>
+                <Grid
+                  templateColumns={{
+                    base: "1fr",
+                    sm: "repeat(2, 1fr)",
+                    md: "repeat(4, 1fr)",
+                    lg: "repeat(5, 1fr)",
+                  }}
+                  gap={4}
+                  mb={10}
+                >
+                  {group.suggestions.map((item) => (
+                    <CardComponent key={`individual-${group.based_on}-${item.type}-${item.id}`} item={item} type={item.type} />
+                  ))}
+                </Grid>
+              </div>
             ))}
-      </Grid>
+        </>
+      )}
     </Container>
   );
 };

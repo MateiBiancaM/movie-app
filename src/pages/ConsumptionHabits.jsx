@@ -86,12 +86,11 @@ const ConsumptionHabits = () => {
                 const totalRating = data.reduce((acc, item) => acc + (item.rating || 0), 0);
                 statistics.averageRating = data.length ? totalRating / data.length : 0;
 
-                const weekdayCounts = [0, 0, 0, 0, 0, 0, 0]; 
+                const weekdayCounts = [0, 0, 0, 0, 0, 0, 0]; // start with Sunday
                 data.forEach(item => {
                     if (item.type === 'movie' && item.watchDate) {
                         const date = new Date(item.watchDate);
                         let dayOfWeek = date.getDay();
-                        dayOfWeek = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
                         weekdayCounts[dayOfWeek]++;
                     }
                 });

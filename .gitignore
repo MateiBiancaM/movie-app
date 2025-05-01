@@ -26,5 +26,6 @@ dist-ssr
 #env
 .env
 
-# Python virtual environment
-src/server_recommendations/venv/
+# Python 
+recommendation-server/__pycache__/
+*.py[cod]
