@@ -13,6 +13,7 @@ import {
   fetchCredits,
   fetchMoviesBulk,
   fetchTvSeriesBulk,
+  getGenreMap,
 } from "../services/api";
 import axios from "axios";
 import CardComponent from "../components/CardComponent";
@@ -33,20 +34,22 @@ const Recommendations = () => {
       try {
         setIsLoading(true);
 
+        const genreMap = await getGenreMap();
+        if (Object.keys(genreMap).length === 0) return;
         const watched = await getWatched(user.uid);
         const favorites = watched
           .filter((item) => item.favorite)
           .sort((a, b) => new Date(b.watchDate) - new Date(a.watchDate))
           .slice(0, 5);
-
+        
         const favoritesWithTags = await Promise.all(
           favorites.map(async (item) => {
             const credits = await fetchCredits(item.type, item.id);
             const tags = [
-              ...(item.overview?.split(" ") || []),
-              ...(item.genre_ids || []),
-              ...(credits.cast?.slice(0, 5).map((a) => a.name) || []),
-              ...(credits.crew?.slice(0, 3).map((p) => p.job + " " + p.name) || []),
+              ...(item.description?.split(" ") || []),
+              ...(item.genres?.map((g) => g.toLowerCase()) || []),
+              ...(credits.cast?.slice(0, 3).map((a) => a.name) || []),
+              ...(credits.crew?.filter(p => p.job === "Director").map((p) => p.job + " " + p.name) || []),
             ].join(" ");
 
             return {
@@ -75,9 +78,9 @@ const Recommendations = () => {
             const credits = await fetchCredits(type, item.id);
             const tags = [
               ...(item.overview?.split(" ") || []),
-              ...(item.genre_ids || []),
-              ...(credits.cast?.slice(0, 5).map((a) => a.name) || []),
-              ...(credits.crew?.slice(0, 3).map((p) => p.job + " " + p.name) || []),
+              ...(item.genre_ids?.map((id) => genreMap[id]?.toLowerCase()) || []),
+              ...(credits.cast?.slice(0, 3).map((a) => a.name) || []),
+              ...(credits.crew?.filter(p => p.job === "Director").map((p) => p.job + " " + p.name) || []),
             ].join(" ");
 
             return {
@@ -112,7 +115,9 @@ const Recommendations = () => {
             m.release_date &&
             typeof m.vote_average === "number"
         );
-
+        console.log("🎯 Favorites with tags:", cleanedFavorites);
+        console.log("📚 Discover with tags:", cleanedDiscover);
+        
         console.log("📦 Trimitem la backend:", {
           favorites: cleanedFavorites.length,
           discover: cleanedDiscover.length,

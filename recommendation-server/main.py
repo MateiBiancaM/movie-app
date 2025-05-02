@@ -5,9 +5,11 @@ import pandas as pd
 import numpy as np
 import nltk
 from nltk.stem.porter import PorterStemmer
-from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from fastapi.middleware.cors import CORSMiddleware
+from collections import Counter
+from sklearn.feature_extraction.text import TfidfVectorizer
+
 
 nltk.download("punkt")
 ps = PorterStemmer()
@@ -44,25 +46,71 @@ class RecommendRequest(BaseModel):
 def root():
     return {"message": "Success!"}
 
+GENRES = {
+    "action", "adventure", "animation", "comedy", "crime", "documentary",
+    "drama", "family", "fantasy", "history", "horror", "music", "mystery",
+    "romance", "science fiction", "tv movie", "thriller", "war", "western"
+}
+
+def extract_genres(text):
+    return set(word.lower() for word in text.split() if word.lower() in GENRES)
+
+def normalize(series):
+    return (series - series.min()) / (series.max() - series.min() + 1e-6)
+
 @app.post("/recommend")
 def recommend(request: RecommendRequest):
     discover_df = pd.DataFrame([movie.dict() for movie in request.discover])
-    discover_df["tags"] = discover_df["tags"].apply(stem)
-
-    # vectorizare
-    cv = CountVectorizer(max_features=5000, stop_words='english')
-    vectorizer_fitted = cv.fit(discover_df["tags"])
-    discover_vectors = vectorizer_fitted.transform(discover_df["tags"]).toarray()
-
-    exclude_ids = {(movie.id, movie.type) for movie in request.favorites}
-
-    # recomandari generale
     favorites_df = pd.DataFrame([movie.dict() for movie in request.favorites])
-    favorites_df["tags"] = favorites_df["tags"].apply(stem)
-    favorite_vectors = vectorizer_fitted.transform(favorites_df["tags"]).toarray()
+
+    # Procesare release_date -> year
+    discover_df["release_year"] = pd.to_datetime(discover_df["release_date"], errors='coerce').dt.year
+    favorites_df["release_year"] = pd.to_datetime(favorites_df["release_date"], errors='coerce').dt.year
+
+    # Construim combined_tags
+    def build_combined_tags(row):
+        return f"{row['title']} {row['tags']} {row['type']} {row['release_year']}"
+
+    discover_df["combined_tags"] = discover_df.apply(build_combined_tags, axis=1).fillna("")
+    favorites_df["combined_tags"] = favorites_df.apply(build_combined_tags, axis=1).fillna("")
+
+    # Stemming
+    discover_df["combined_tags"] = discover_df["combined_tags"].apply(stem)
+    favorites_df["combined_tags"] = favorites_df["combined_tags"].apply(stem)
+
+    # TF-IDF
+    all_tags = pd.concat([discover_df["combined_tags"], favorites_df["combined_tags"]])
+    vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
+    vectorizer_fitted = vectorizer.fit(all_tags)
+
+    discover_vectors = vectorizer_fitted.transform(discover_df["combined_tags"]).toarray()
+    favorite_vectors = vectorizer_fitted.transform(favorites_df["combined_tags"]).toarray()
     user_profile = np.mean(favorite_vectors, axis=0).reshape(1, -1)
 
+    # Similaritate + bonusuri
     similarity_general = cosine_similarity(user_profile, discover_vectors).flatten()
+
+    most_common_type = Counter(favorites_df["type"]).most_common(1)[0][0]
+    discover_df["type_match"] = discover_df["type"].apply(lambda t: 1 if t == most_common_type else 0)
+    discover_df["vote_bonus"] = normalize(discover_df["vote_average"])
+    discover_df["year_bonus"] = normalize(discover_df["release_year"].fillna(0))
+
+    # Genuri favorite
+    fav_genres = favorites_df["tags"].apply(extract_genres)
+    all_fav_genres = set.union(*fav_genres) if not fav_genres.empty else set()
+    discover_df["genre_match"] = discover_df["tags"].apply(
+        lambda t: len(extract_genres(t).intersection(all_fav_genres))
+    )
+    genre_bonus = normalize(discover_df["genre_match"])
+
+    similarity_general += (
+        0.1 * discover_df["type_match"] +
+        0.2 * discover_df["vote_bonus"] +
+        0.1 * discover_df["year_bonus"] +
+        0.3 * genre_bonus
+    )
+
+    exclude_ids = {(movie.id, movie.type) for movie in request.favorites}
 
     scored_general = [
         (i, similarity_general[i])
@@ -83,22 +131,28 @@ def recommend(request: RecommendRequest):
         if len(general_recommendations) >= 20:
             break
 
-    # recomandari individuale
+    # Recomandări individuale (cu accent puternic pe gen)
     individual_recommendations = []
     used_individual_ids = set()
 
-    for favorite in request.favorites:
-        fav_tags_stemmed = stem(favorite.tags)
-        fav_vector = vectorizer_fitted.transform([fav_tags_stemmed]).toarray()
-
+    for _, favorite in favorites_df.iterrows():
+        fav_vector = vectorizer_fitted.transform([favorite["combined_tags"]]).toarray()
         similarity_scores = cosine_similarity(fav_vector, discover_vectors).flatten()
 
+        fav_genres = extract_genres(favorite["tags"])
+        genre_matches = discover_df["tags"].apply(
+            lambda t: len(fav_genres.intersection(extract_genres(t)))
+        )
+        genre_bonus = normalize(genre_matches)
+
+        final_score = similarity_scores + 0.4 * genre_bonus + 0.1 * discover_df["type_match"]
+
         scored_individual = [
-            (i, similarity_scores[i])
-            for i in range(len(similarity_scores))
+            (i, final_score[i])
+            for i in range(len(final_score))
             if (
-                (discover_df.iloc[i]["id"], discover_df.iloc[i]["type"]) not in exclude_ids
-                and (discover_df.iloc[i]["id"], discover_df.iloc[i]["type"]) not in used_individual_ids
+                (discover_df.iloc[i]["id"], discover_df.iloc[i]["type"]) not in exclude_ids and
+                (discover_df.iloc[i]["id"], discover_df.iloc[i]["type"]) not in used_individual_ids
             )
         ]
 
@@ -117,7 +171,7 @@ def recommend(request: RecommendRequest):
         suggestions = [discover_df.iloc[i].to_dict() for i in top_indices]
 
         individual_recommendations.append({
-            "based_on": favorite.title,
+            "based_on": favorite["title"],
             "suggestions": suggestions
         })
 
@@ -125,3 +179,4 @@ def recommend(request: RecommendRequest):
         "general": general_recommendations,
         "individual": individual_recommendations
     }
+

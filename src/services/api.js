@@ -67,7 +67,7 @@ export const getGenreMap = async () => {
 
     const genreMap = {};
     allGenres.forEach((genre) => {
-      genreMap[genre.id] = genre.name;
+      genreMap[genre.id] = genre.name.toLowerCase();
     });
 
     return genreMap; // Ex: {28: "Action", 12: "Adventure", ...}
