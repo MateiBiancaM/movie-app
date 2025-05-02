@@ -47,15 +47,31 @@ export default function FinancialReports() {
   useEffect(() => {
     const loadData = async () => {
       if (!userId) return;
+  
       const doc = await getDocument("users", userId, "financialReports", currentMonthKey);
+  
       if (doc) {
         setBudgetLimit(doc.budgetLimit || 0);
         setSubscriptions(doc.subscriptions || []);
         setMonthlyExpenses(doc.monthlyExpenses || []);
+      } else {
+        // Dacă nu există pentru luna curentă, caută în luna trecută
+        const lastMonthKey = addMonths(new Date(currentMonthKey + "-01"), -1).toISOString().slice(0, 7);
+        const lastMonthDoc = await getDocument("users", userId, "financialReports", lastMonthKey);
+  
+        const inferredBudget = lastMonthDoc?.budgetLimit || 0;
+        setBudgetLimit(inferredBudget);
+  
+        await saveDocument("users", userId, "financialReports", currentMonthKey, {
+          budgetLimit: inferredBudget,
+          subscriptions: [],
+          monthlyExpenses: []
+        });
       }
     };
     loadData();
   }, [userId, currentMonthKey]);
+  
 
   useEffect(() => {
     if (!userId || subscriptions.length === 0) return;

@@ -8,7 +8,7 @@ from nltk.stem.porter import PorterStemmer
 from sklearn.metrics.pairwise import cosine_similarity
 from fastapi.middleware.cors import CORSMiddleware
 from collections import Counter
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sentence_transformers import SentenceTransformer
 
 
 nltk.download("punkt")
@@ -78,13 +78,20 @@ def recommend(request: RecommendRequest):
     discover_df["combined_tags"] = discover_df["combined_tags"].apply(stem)
     favorites_df["combined_tags"] = favorites_df["combined_tags"].apply(stem)
 
-    # TF-IDF
-    all_tags = pd.concat([discover_df["combined_tags"], favorites_df["combined_tags"]])
-    vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
-    vectorizer_fitted = vectorizer.fit(all_tags)
+    # Încarcă modelul MPNet
+    embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
 
-    discover_vectors = vectorizer_fitted.transform(discover_df["combined_tags"]).toarray()
-    favorite_vectors = vectorizer_fitted.transform(favorites_df["combined_tags"]).toarray()
+    # Obține textele (cu stemming deja aplicat)
+    discover_texts = discover_df["combined_tags"].tolist()
+    favorites_texts = favorites_df["combined_tags"].tolist()
+
+    # Concatenează pentru embedding consistent
+    all_texts = discover_texts + favorites_texts
+    all_embeddings = embedding_model.encode(all_texts, convert_to_numpy=True)
+
+    # Separă vectorii
+    discover_vectors = all_embeddings[:len(discover_texts)]
+    favorite_vectors = all_embeddings[len(discover_texts):]
     user_profile = np.mean(favorite_vectors, axis=0).reshape(1, -1)
 
     # Similaritate + bonusuri
@@ -136,8 +143,8 @@ def recommend(request: RecommendRequest):
     used_individual_ids = set()
 
     for _, favorite in favorites_df.iterrows():
-        fav_vector = vectorizer_fitted.transform([favorite["combined_tags"]]).toarray()
-        similarity_scores = cosine_similarity(fav_vector, discover_vectors).flatten()
+        fav_embedding = embedding_model.encode([favorite["combined_tags"]], convert_to_numpy=True)
+        similarity_scores = cosine_similarity(fav_embedding, discover_vectors).flatten()
 
         fav_genres = extract_genres(favorite["tags"])
         genre_matches = discover_df["tags"].apply(
