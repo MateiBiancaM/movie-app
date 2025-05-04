@@ -4,7 +4,7 @@ import { useAuth } from "../context/useAuth";
 import { useFirestore } from "../services/firestore";
 import { TimeIcon } from "@chakra-ui/icons";
 import { minutesToDaysHours } from "../utils/helpers";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer} from 'recharts';
 
 const ConsumptionHabits = () => {
     const { user } = useAuth();

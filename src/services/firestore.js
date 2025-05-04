@@ -170,7 +170,6 @@ export const useFirestore = () => {
             if (docSnap.exists()) {
                 return docSnap.data();
             } else {
-                console.warn("⚠️ Document not found:", docRef.path);
                 return null;
             }
         } catch (error) {
