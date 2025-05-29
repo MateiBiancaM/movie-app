@@ -78,7 +78,7 @@ def recommend(request: RecommendRequest):
     discover_df["combined_tags"] = discover_df["combined_tags"].apply(stem)
     favorites_df["combined_tags"] = favorites_df["combined_tags"].apply(stem)
 
-    # Încarcă modelul MPNet
+    # Încarcă modelul
     embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
 
     # Obține textele (cu stemming deja aplicat)

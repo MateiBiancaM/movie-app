@@ -216,7 +216,7 @@ const ConsumptionHabits = () => {
                                 <Text fontSize="lg" fontWeight="bold" color="cyan.300">
                                     {genre.name}
                                 </Text>
-                                <Text color="gray.400">{genre.count} titluri</Text>
+                                <Text color="gray.400">{genre.count} titles</Text>
                             </Box>
                         ))}
                     </Grid>

@@ -3,7 +3,6 @@ import { auth } from "../services/firebase";
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import PropTypes from "prop-types";
 
-//signInWithEmailAndPassword
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {

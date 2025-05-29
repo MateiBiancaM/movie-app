@@ -10,7 +10,7 @@ export const useFirestore = () => {
     // --- WATCHLIST FUNCTIONS ---
 
     const addDocument = async (collectionName, data) => {
-        // Add a new document with a generated id.
+        // new document with a generated id.
         const docRef = await addDoc(collection(db, collectionName), data);
         console.log("Document written with ID: ", docRef.id);
     };
@@ -151,9 +151,8 @@ export const useFirestore = () => {
         try {
             const docRef = doc(db, col1, doc1, col2, doc2);
             await setDoc(docRef, data);
-            console.log("✅ Document saved at:", docRef.path);
         } catch (error) {
-            console.error("❌ Error saving document:", error);
+            console.error("Error saving document:", error);
             toast({
                 title: "Eroare",
                 description: "Nu s-a putut salva în baza de date.",
@@ -173,7 +172,7 @@ export const useFirestore = () => {
                 return null;
             }
         } catch (error) {
-            console.error("❌ Error reading document:", error);
+            console.error("Error reading document:", error);
             return null;
         }
     };

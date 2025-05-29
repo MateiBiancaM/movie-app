@@ -5,11 +5,6 @@ import { imagePath } from '../services/api';
 import { StarIcon } from '@chakra-ui/icons';
 
 const CardComponent = ({item, type,similarity }) => {
-    const getSimilarityColor = (value) => {
-        if (value >= 0.8) return "green";
-        if (value >= 0.5) return "yellow";
-        return "red";
-      };
   return (
     <Link to={`/${type}/${item?.id}`}>
         <Box 
@@ -30,26 +25,6 @@ const CardComponent = ({item, type,similarity }) => {
                 height="100%"
                 objectFit="cover"
             />
-
-{/* Similarity Badge in corner if exists */}
-{similarity !== undefined && (
-          <Box 
-            position="absolute"
-            top="2"
-            left="2"
-            bg="gray.800"
-            color="white"
-            fontSize="xs"
-            px="2"
-            py="1"
-            borderRadius="md"
-            opacity="0.85"
-            zIndex="1"
-          >
-            {`${(similarity * 100).toFixed(1)}%`}
-          </Box>
-        )}
-
             <Box 
                 position="absolute"
                 bottom="0"

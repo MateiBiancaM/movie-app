@@ -53,6 +53,7 @@ export const searchData = async (querry, page) => {
   return res?.data;
 }
 
+//GENERE
 export const getGenreMap = async () => {
   try {
     const [movieGenres, tvGenres] = await Promise.all([
@@ -70,7 +71,7 @@ export const getGenreMap = async () => {
       genreMap[genre.id] = genre.name.toLowerCase();
     });
 
-    return genreMap; // Ex: {28: "Action", 12: "Adventure", ...}
+    return genreMap; // 28: "Action", 12: "Adventure"
   } catch (error) {
     console.error("Failed to fetch genres:", error);
     return {};

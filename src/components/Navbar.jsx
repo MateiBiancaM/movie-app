@@ -1,4 +1,4 @@
-import { Avatar, Box, Button, Container, Drawer, DrawerBody, DrawerCloseButton, DrawerContent, DrawerHeader, DrawerOverlay, Flex, IconButton, Menu, MenuButton, MenuItem, MenuList, useDisclosure } from "@chakra-ui/react";
+import { Avatar, Box, Button, Container, Drawer, DrawerBody, DrawerCloseButton, DrawerContent, DrawerHeader, DrawerOverlay, Flex, IconButton, Menu, MenuButton, MenuItem, MenuList, useDisclosure, Image, HStack } from "@chakra-ui/react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { HamburgerIcon, SearchIcon } from "@chakra-ui/icons";
@@ -22,15 +22,18 @@ const Navbar = () => {
 
           {/* Logo */}
           <Link to="/">
-            <Box
-              fontSize="2xl"
-              fontWeight="bold"
-              color="red"
-              letterSpacing="widest"
-              fontFamily="mono"
-            >
-              CineTrack
-            </Box>
+            <HStack spacing={2} align="center">
+              <Image src="/logo.png" alt="logo" boxSize="64px" />
+              <Box
+                fontSize="3xl"
+                fontWeight="bold"
+                color="#9F3CFA"
+                letterSpacing="widest"
+                fontFamily="mono"
+              >
+                CineTrack
+              </Box>
+            </HStack>
           </Link>
 
           {/* DESKTOP */}
@@ -54,14 +57,14 @@ const Navbar = () => {
                   <Link to="/watched">
                     <MenuItem>Watched</MenuItem>
                   </Link>
+                  <Link to="/recommendations">
+                    <MenuItem>Recommendations</MenuItem>
+                  </Link>
                   <Link to="/consumption">
                     <MenuItem>Consumption Habits</MenuItem>
                   </Link>
                   <Link to="/financial">
                     <MenuItem>Financial Reports</MenuItem>
-                  </Link>
-                  <Link to="/recommendations">
-                    <MenuItem>Recommendations</MenuItem>
                   </Link>
                   <MenuItem onClick={logout}>Logout</MenuItem>
                 </MenuList>
@@ -114,10 +117,9 @@ const Navbar = () => {
                       <>
                         <Link to="/watchlist">Watchlist</Link>
                         <Link to="/watched">Watched</Link>
-                        <Link to="/consumption">Consumption Habits</Link>
-                        <Link to="/financial">Financial Reports</Link>
                         <Link to="/recommendations">Recommendations</Link>
                         <Link to="/consumption">Consumption Habits</Link>
+                        <Link to="/financial">Financial Reports</Link>
                         <Button
                           variant={"outline"}
                           colorScheme="red"

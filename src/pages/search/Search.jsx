@@ -9,18 +9,18 @@ const Search = () => {
   const [activePage, setActivePage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [data, setData] = useState([]);
-  const [totalPages, setTotalPages]=useState(1);
-  const [tempSearchValue,setTempSearchValue] =useState('');
+  const [totalPages, setTotalPages] = useState(1);
+  const [tempSearchValue, setTempSearchValue] = useState('');
 
-  useEffect(()=>{
+  useEffect(() => {
     searchData(searchValue, activePage)
-    .then((res) => {
-      setData(res?.results);
-      setActivePage(res?.page);
-      setTotalPages(res?.total_pages)
-    }).catch((err) => console.log(err, "err"))
-    .finally(() => setIsLoading(false));
-  },[searchValue, activePage])
+      .then((res) => {
+        setData(res?.results);
+        setActivePage(res?.page);
+        setTotalPages(res?.total_pages)
+      }).catch((err) => console.log(err, "err"))
+      .finally(() => setIsLoading(false));
+  }, [searchValue, activePage])
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -68,22 +68,22 @@ const Search = () => {
         md: "repeat(4, 1fr)",
         lg: "repeat(5, 1fr)",
       }} gap={"4"} mt={"10"}>
-        {data?.length > 0 && !isLoading && data?.map((item, i) => (
-          isLoading ? (
-            <Skeleton height={300} key={i} />
-          ) : (
+        {data?.length > 0 && !isLoading && data
+          .filter(item => item.poster_path)//doar unde avem poster_path
+          .map((item) => (
             <CardComponent
               key={item?.id}
               item={item}
-              type={item?.media_type} />)
-        ))}
+              type={item?.media_type}
+            />
+          ))}
       </Grid>
 
-      {data?.length>0 && !isLoading && (
-        <PaginationComponent 
-        activePage={activePage} 
-        totalPages={totalPages} 
-        setActivePage={setActivePage}/>
+      {data?.length > 0 && !isLoading && (
+        <PaginationComponent
+          activePage={activePage}
+          totalPages={totalPages}
+          setActivePage={setActivePage} />
       )}
     </Container>
   )
