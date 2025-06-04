@@ -211,124 +211,151 @@ export default function FinancialReports() {
     { name: "Monthly", value: monthlyTotal }
   ];
 
-  return (
-    <Container maxW="container.lg" p={4}>
-      <VStack spacing={6} align="stretch">
-        <Box borderWidth="1px" borderRadius="lg" p={4}>
-          <Heading size="md" mb={2}>Monthly budget limit</Heading>
-          <FormControl>
-            <Input
-              type="number"
-              placeholder="Monthly budget limit"
-              value={budgetLimit}
-              onChange={(e) => setBudgetLimit(parseFloat(e.target.value))}
-              onBlur={handleBudgetBlur}
-            />
-          </FormControl>
-          <Text fontSize="sm" mt={2} color={isOverBudget ? "red.500" : "gray.600"} fontWeight={isOverBudget ? "bold" : "normal"}>
-            Current expenses: {totalExpenses} / {budgetLimit} RON
-          </Text>
-        </Box>
+  // MODIFICARE STRUCTURĂ COMPONENTĂ
+return (
+  <Container maxW="container.lg" p={4}>
+    <VStack spacing={6} align="stretch">
+      {/* --- GRAFICELE SUS --- */}
+      <Box borderWidth="1px" borderRadius="lg" p={4}>
+        <Heading size="md" mb={2}>Spending overview</Heading>
+        <ResponsiveContainer width="100%" height={250}>
+          <BarChart data={monthlyTotals}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="month" />
+            <YAxis />
+            <Tooltip />
+            <Bar dataKey="total" fill="#9F3CFA" />
+          </BarChart>
+        </ResponsiveContainer>
+      </Box>
 
-        <Box borderWidth="1px" borderRadius="lg" p={4}>
-          <Heading size="md" mb={2}>Add expense</Heading>
-          <Select value={expenseType} onChange={(e) => setExpenseType(e.target.value)}>
-            <option value="subscription">Subscription</option>
-            <option value="monthly">Monthly expense</option>
-          </Select>
-          <VStack spacing={2} mt={4}>
-            {expenseType === "subscription" ? (
-              <>
-                <Input placeholder="Platform" value={newExpense.platform || ""} onChange={e => setNewExpense({ ...newExpense, platform: e.target.value })} />
-                <Input placeholder="Price" type="number" value={newExpense.price || ""} onChange={e => setNewExpense({ ...newExpense, price: e.target.value })} />
-                <Input placeholder="Contract period" value={newExpense.period || ""} onChange={e => setNewExpense({ ...newExpense, period: e.target.value })} />
-                <Input placeholder="Included services (optional)" value={newExpense.services || ""} onChange={e => setNewExpense({ ...newExpense, services: e.target.value })} />
-              </>
-            ) : (
-              <>
-                <Input placeholder="Expense name" value={newExpense.name || ""} onChange={e => setNewExpense({ ...newExpense, name: e.target.value })} />
-                <Input placeholder="Price" type="number" value={newExpense.price || ""} onChange={e => setNewExpense({ ...newExpense, price: e.target.value })} />
-              </>
-            )}
-            <Button colorScheme="teal" onClick={handleAddExpense}>Add</Button>
-          </VStack>
-        </Box>
-
-        <Box borderWidth="1px" borderRadius="lg" p={4}>
-          <HStack justify="space-between" onClick={toggleSubs} cursor="pointer">
-            <Heading size="md">Active subscriptions</Heading>
-            <IconButton size="sm" icon={isSubsOpen ? <ChevronDownIcon /> : <ChevronRightIcon />} />
-          </HStack>
-          <Collapse in={isSubsOpen} animateOpacity>
-            <VStack spacing={3} align="stretch" mt={4}>
-              {subscriptions.map((sub, index) => (
-                <Box key={index} borderBottomWidth="1px" pb={2}>
-                  <HStack justify="space-between">
-                    <Box>
-                      <Text fontWeight="semibold">{sub.platform}</Text>
-                      <Text fontSize="sm">{sub.price} RON / {sub.period}</Text>
-                      <Text fontSize="sm" color="gray.500">{sub.services}</Text>
-                    </Box>
-                    <Button colorScheme="red" size="sm" onClick={() => handleCancelSubscription(sub.platform)}>
-                      Cancel
-                    </Button>
-                  </HStack>
-                </Box>
+      <Box borderWidth="1px" borderRadius="lg" p={4}>
+        <Heading size="md" mb={2}>Expense type distribution</Heading>
+        <ResponsiveContainer width="100%" height={350}>
+          <PieChart>
+            <Pie
+              data={pieData}
+              dataKey="value"
+              nameKey="name"
+              cx="50%"
+              cy="50%"
+              outerRadius={120}
+              label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+                const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                const x = cx + radius * Math.cos(-midAngle * (Math.PI / 180));
+                const y = cy + radius * Math.sin(-midAngle * (Math.PI / 180));
+                return (
+                  <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central">
+                    {`${(percent * 100).toFixed(0)}%`}
+                  </text>
+                );
+              }}
+              labelLine={false}
+            >
+              {pieData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
-            </VStack>
-          </Collapse>
-        </Box>
+            </Pie>
+            <Tooltip />
+            <Legend />
+          </PieChart>
+        </ResponsiveContainer>
+      </Box>
 
-        <Box borderWidth="1px" borderRadius="lg" p={4}>
-          <HStack justify="space-between" onClick={toggleHistory} cursor="pointer">
-            <Heading size="md">Expense history (last 6 months)</Heading>
-            <IconButton size="sm" icon={isHistoryOpen ? <ChevronDownIcon /> : <ChevronRightIcon />} />
-          </HStack>
-          <Collapse in={isHistoryOpen} animateOpacity>
-            <VStack spacing={4} align="stretch" mt={4}>
-              <Box borderWidth="1px" borderRadius="lg" p={4}>
-                <Heading size="md" mb={2}>Spending overview</Heading>
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={monthlyTotals}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="total" fill="#3182CE" />
-                  </BarChart>
-                </ResponsiveContainer>
+      {/* --- ADD EXPENSE --- */}
+      <Box borderWidth="1px" borderRadius="lg" p={4}>
+        <Heading size="md" mb={2}>Add expense</Heading>
+        <Select value={expenseType} onChange={(e) => setExpenseType(e.target.value)}>
+          <option value="subscription">Subscription</option>
+          <option value="monthly">Monthly expense</option>
+        </Select>
+        <VStack spacing={2} mt={4}>
+          {expenseType === "subscription" ? (
+            <>
+              <Input placeholder="Platform" value={newExpense.platform || ""} onChange={e => setNewExpense({ ...newExpense, platform: e.target.value })} />
+              <Input placeholder="Price" type="number" value={newExpense.price || ""} onChange={e => setNewExpense({ ...newExpense, price: e.target.value })} />
+              <Input placeholder="Contract period" value={newExpense.period || ""} onChange={e => setNewExpense({ ...newExpense, period: e.target.value })} />
+              <Input placeholder="Included services (optional)" value={newExpense.services || ""} onChange={e => setNewExpense({ ...newExpense, services: e.target.value })} />
+            </>
+          ) : (
+            <>
+              <Input placeholder="Expense name" value={newExpense.name || ""} onChange={e => setNewExpense({ ...newExpense, name: e.target.value })} />
+              <Input placeholder="Price" type="number" value={newExpense.price || ""} onChange={e => setNewExpense({ ...newExpense, price: e.target.value })} />
+            </>
+          )}
+          <Button colorScheme="teal" onClick={handleAddExpense}>Add</Button>
+        </VStack>
+      </Box>
+
+      {/* --- HISTORY IN EXTENDER --- */}
+      <Box borderWidth="1px" borderRadius="lg" p={4}>
+        <HStack justify="space-between" onClick={toggleHistory} cursor="pointer">
+          <Heading size="md">Expense history (last 6 months)</Heading>
+          <IconButton size="sm" icon={isHistoryOpen ? <ChevronDownIcon /> : <ChevronRightIcon />} />
+        </HStack>
+        <Collapse in={isHistoryOpen} animateOpacity>
+          <VStack spacing={4} align="stretch" mt={4}>
+            {historyEntries.length === 0 ? (
+              <Text fontSize="sm" color="gray.500">No expenses in the last 6 months.</Text>
+            ) : (
+              historyEntries.map((exp, index) => (
+                <HStack key={index} justify="space-between" fontSize="sm" borderBottomWidth="1px" pb={1}>
+                  <Box>
+                    <Text>{exp.name}</Text>
+                    <Text fontSize="xs" color="gray.500">{exp._month}</Text>
+                  </Box>
+                  <Text>{exp.price} RON</Text>
+                </HStack>
+              ))
+            )}
+          </VStack>
+        </Collapse>
+      </Box>
+
+      {/* --- ACTIVE SUBSCRIPTIONS --- */}
+      <Box borderWidth="1px" borderRadius="lg" p={4}>
+        <HStack justify="space-between" onClick={toggleSubs} cursor="pointer">
+          <Heading size="md">Active subscriptions</Heading>
+          <IconButton size="sm" icon={isSubsOpen ? <ChevronDownIcon /> : <ChevronRightIcon />} />
+        </HStack>
+        <Collapse in={isSubsOpen} animateOpacity>
+          <VStack spacing={3} align="stretch" mt={4}>
+            {subscriptions.map((sub, index) => (
+              <Box key={index} borderBottomWidth="1px" pb={2}>
+                <HStack justify="space-between">
+                  <Box>
+                    <Text fontWeight="semibold">{sub.platform}</Text>
+                    <Text fontSize="sm">{sub.price} RON / {sub.period}</Text>
+                    <Text fontSize="sm" color="gray.500">{sub.services}</Text>
+                  </Box>
+                  <Button colorScheme="red" size="sm" onClick={() => handleCancelSubscription(sub.platform)}>
+                    Cancel
+                  </Button>
+                </HStack>
               </Box>
-              <Box borderWidth="1px" borderRadius="lg" p={4}>
-                <Heading size="md" mb={2}>Expense type distribution</Heading>
-                <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
-                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80}>
-                      {pieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </Box>
-              {historyEntries.length === 0 ? (
-                <Text fontSize="sm" color="gray.500">No expenses in the last 6 months.</Text>
-              ) : (
-                historyEntries.map((exp, index) => (
-                  <HStack key={index} justify="space-between" fontSize="sm" borderBottomWidth="1px" pb={1}>
-                    <Box>
-                      <Text>{exp.name}</Text>
-                      <Text fontSize="xs" color="gray.500">{exp._month}</Text>
-                    </Box>
-                    <Text>{exp.price} RON</Text>
-                  </HStack>
-                ))
-              )}
-            </VStack>
-          </Collapse>
-        </Box>
-      </VStack>
-    </Container>
-  );
+            ))}
+          </VStack>
+        </Collapse>
+      </Box>
+
+      {/* --- SETARE BUGET LA FINAL --- */}
+      <Box borderWidth="1px" borderRadius="lg" p={4}>
+        <Heading size="md" mb={2}>Monthly budget limit</Heading>
+        <FormControl>
+          <Input
+            type="number"
+            placeholder="Monthly budget limit"
+            value={budgetLimit}
+            onChange={(e) => setBudgetLimit(parseFloat(e.target.value))}
+            onBlur={handleBudgetBlur}
+          />
+        </FormControl>
+        <Text fontSize="sm" mt={2} color={isOverBudget ? "red.500" : "gray.600"} fontWeight={isOverBudget ? "bold" : "normal"}>
+          Current expenses: {totalExpenses} / {budgetLimit} RON
+        </Text>
+      </Box>
+    </VStack>
+  </Container>
+);
+
 }

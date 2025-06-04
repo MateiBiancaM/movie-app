@@ -237,7 +237,7 @@ const ConsumptionHabits = () => {
                                 formatter={(value) => [`${value} movies`, 'Count']}
                                 labelFormatter={(label) => `${label}day`}
                             />
-                            <Bar dataKey="count" fill="#4299E1" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="count" fill="#9F3CFA" radius={[4, 4, 0, 0]} />
                         </BarChart>
                     </ResponsiveContainer>
                 </Box>
