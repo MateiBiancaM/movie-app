@@ -86,7 +86,7 @@ const ConsumptionHabits = () => {
                 const totalRating = data.reduce((acc, item) => acc + (item.rating || 0), 0);
                 statistics.averageRating = data.length ? totalRating / data.length : 0;
 
-                const weekdayCounts = [0, 0, 0, 0, 0, 0, 0]; // start with Sunday
+                const weekdayCounts = [0, 0, 0, 0, 0, 0, 0]; 
                 data.forEach(item => {
                     if (item.type === 'movie' && item.watchDate) {
                         const date = new Date(item.watchDate);
@@ -128,7 +128,7 @@ const ConsumptionHabits = () => {
         <Container maxW="container.xl">
             <Flex alignItems="baseline" gap="4" my="10">
                 <Heading as="h2" fontSize="md" textTransform="uppercase">
-                    Viewing Habits
+                    Consumption Habits
                 </Heading>
             </Flex>
 

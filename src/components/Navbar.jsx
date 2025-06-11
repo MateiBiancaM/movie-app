@@ -73,7 +73,6 @@ const Navbar = () => {
             {!user && (
               <Avatar size="sm" bg="gray.800" as="button" onClick={handleGoogleLogin} />
             )}
-
           </Flex>
 
           {/* MOBILE */}
