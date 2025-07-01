@@ -6,6 +6,10 @@ import {
   Heading,
   Select,
   Spinner,
+  Textarea,
+  Button,
+  Text,
+  Box,
 } from "@chakra-ui/react";
 import { useFirestore } from "../services/firestore";
 import { useAuth } from "../context/useAuth";
@@ -21,11 +25,15 @@ import CardComponent from "../components/CardComponent";
 const Recommendations = () => {
   const { getWatched } = useFirestore();
   const { user } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
-  const [filter, setFilter] = useState("general"); // general | individual
 
+  const [isLoading, setIsLoading] = useState(true);
+  const [filter, setFilter] = useState("general");
   const [general, setGeneral] = useState([]);
   const [individual, setIndividual] = useState([]);
+
+  const [emotionInput, setEmotionInput] = useState("");
+  const [emotionResults, setEmotionResults] = useState([]);
+  const [emotion, setEmotion] = useState("");
 
   useEffect(() => {
     const loadRecommendations = async () => {
@@ -36,12 +44,13 @@ const Recommendations = () => {
 
         const genreMap = await getGenreMap();
         if (Object.keys(genreMap).length === 0) return;
+
         const watched = await getWatched(user.uid);
         const favorites = watched
           .filter((item) => item.favorite)
           .sort((a, b) => new Date(b.watchDate) - new Date(a.watchDate))
           .slice(0, 5);
-        
+
         const favoritesWithTags = await Promise.all(
           favorites.map(async (item) => {
             const credits = await fetchCredits(item.type, item.id);
@@ -65,12 +74,11 @@ const Recommendations = () => {
         );
 
         const [moviesRes, seriesRes] = await Promise.all([
-          fetchMoviesBulk(6), // poți crește dacă vrei
+          fetchMoviesBulk(6),
           fetchTvSeriesBulk(6),
         ]);
 
         const discoverItems = [...moviesRes.results, ...seriesRes.results];
-        console.log("Total:", discoverItems.length);
 
         const discoverWithTags = await Promise.all(
           discoverItems.map(async (item) => {
@@ -95,7 +103,6 @@ const Recommendations = () => {
           })
         );
 
-        //Filtrăm doar filme complete
         const cleanedFavorites = favoritesWithTags.filter(
           (m) =>
             m.id &&
@@ -115,13 +122,6 @@ const Recommendations = () => {
             m.release_date &&
             typeof m.vote_average === "number"
         );
-        console.log("🎯 Favorites with tags:", cleanedFavorites);
-        console.log("📚 Discover with tags:", cleanedDiscover);
-        
-        console.log("📦 Trimitem la backend:", {
-          favorites: cleanedFavorites.length,
-          discover: cleanedDiscover.length,
-        });
 
         const res = await axios.post("http://localhost:8001/recommend", {
           favorites: cleanedFavorites,
@@ -140,6 +140,36 @@ const Recommendations = () => {
     loadRecommendations();
   }, [user]);
 
+  const handleEmotionRecommend = async () => {
+    if (!emotionInput.trim()) return;
+    setIsLoading(true);
+    setEmotionResults([]);
+    try {
+     const res = await axios.post("http://localhost:8001/emotion-recommend", {
+  text: emotionInput,
+  discover: general.concat(...individual.flatMap((i) => i.suggestions)),
+});
+
+// Elimină duplicatele pe bază de id + type
+const uniqueResults = [];
+const seenKeys = new Set();
+for (const item of res.data.recommended) {
+  const key = `${item.id}-${item.type}`;
+  if (!seenKeys.has(key)) {
+    seenKeys.add(key);
+    uniqueResults.push(item);
+  }
+}
+
+setEmotion(res.data.emotion);
+setEmotionResults(uniqueResults);
+    } catch (err) {
+      console.error("Eroare recomandări emoționale:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <Container maxW="container.xl">
       <Flex alignItems="baseline" gap="4" my="10">
@@ -153,6 +183,7 @@ const Recommendations = () => {
         >
           <option value="general">General Recommendations</option>
           <option value="individual">Individual Recommendations</option>
+          <option value="emotion">Emotion-Based Recommendations</option>
         </Select>
       </Flex>
 
@@ -177,7 +208,11 @@ const Recommendations = () => {
                 gap={4}
               >
                 {general.map((item) => (
-                 <CardComponent key={`general-${item.type}-${item.id}`} item={item} type={item.type} />
+                  <CardComponent
+                    key={`general-${item.type}-${item.id}`}
+                    item={item}
+                    type={item.type}
+                  />
                 ))}
               </Grid>
             </>
@@ -187,7 +222,7 @@ const Recommendations = () => {
             individual.map((group, index) => (
               <div key={index}>
                 <Heading as="h3" size="sm" my={4}>
-                 Because you liked <strong>{group.based_on}</strong>, we recommend:
+                  Because you liked <strong>{group.based_on}</strong>, we recommend:
                 </Heading>
                 <Grid
                   templateColumns={{
@@ -200,11 +235,58 @@ const Recommendations = () => {
                   mb={10}
                 >
                   {group.suggestions.map((item) => (
-                    <CardComponent key={`individual-${group.based_on}-${item.type}-${item.id}`} item={item} type={item.type} />
+                    <CardComponent
+                      key={`individual-${group.based_on}-${item.type}-${item.id}`}
+                      item={item}
+                      type={item.type}
+                    />
                   ))}
                 </Grid>
               </div>
             ))}
+
+          {filter === "emotion" && (
+            <Box my={10}>
+              <Heading as="h3" size="md" mb={4}>
+                Emotion-based Recommendations
+              </Heading>
+              <Textarea
+                placeholder="Describe how you feel or what vibe you're looking for..."
+                value={emotionInput}
+                onChange={(e) => setEmotionInput(e.target.value)}
+                rows={4}
+                mb={4}
+              />
+              <Button onClick={handleEmotionRecommend} colorScheme="teal" mb={6}>
+                Get Recommendations
+              </Button>
+
+              {emotionResults.length > 0 && (
+                <>
+                  <Text fontSize="md" mb={2}>
+                    <strong>Detected emotion:</strong> {emotion}
+                  </Text>
+                  <Grid
+                    templateColumns={{
+                      base: "1fr",
+                      sm: "repeat(2, 1fr)",
+                      md: "repeat(4, 1fr)",
+                      lg: "repeat(5, 1fr)",
+                    }}
+                    gap={4}
+                  >
+                    {emotionResults.map((item) => (
+                      <CardComponent
+                        key={`emotion-${item.type}-${item.id}`}
+                        item={item}
+                        type={item.type}
+                      />
+                    ))}
+                  </Grid>
+                </>
+              )}
+            </Box>
+          )}
         </>
       )}
     </Container>

@@ -9,10 +9,13 @@ from sklearn.metrics.pairwise import cosine_similarity
 from fastapi.middleware.cors import CORSMiddleware
 from collections import Counter
 from sentence_transformers import SentenceTransformer
+from transformers import pipeline
 
 
 nltk.download("punkt")
 ps = PorterStemmer()
+# Încarcă modelul
+embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
 
 app = FastAPI()
 
@@ -77,9 +80,6 @@ def recommend(request: RecommendRequest):
     # Stemming
     discover_df["combined_tags"] = discover_df["combined_tags"].apply(stem)
     favorites_df["combined_tags"] = favorites_df["combined_tags"].apply(stem)
-
-    # Încarcă modelul
-    embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
 
     # Obține textele (cu stemming deja aplicat)
     discover_texts = discover_df["combined_tags"].tolist()
@@ -185,5 +185,84 @@ def recommend(request: RecommendRequest):
     return {
         "general": general_recommendations,
         "individual": individual_recommendations
+    }
+
+#Recomandari pe baza de emotii
+emotion_classifier = pipeline("text-classification", model="j-hartmann/emotion-english-distilroberta-base", return_all_scores=True)
+EMOTION_GENRE_MAP = {
+    "joy": ["feel-good", "romantic comedy", "animation", "family", "music"],
+    "sadness": ["uplifting", "drama", "inspirational", "comedy", "romance"],
+    "anger": ["revenge", "action", "thriller", "justice", "crime"],
+    "fear": ["horror", "thriller", "suspense", "survival", "mystery"],
+    "surprise": ["plot twist", "mystery", "sci-fi", "fantasy"],
+    "love": ["romance", "drama", "romantic comedy", "musical"],
+    "gratitude": ["biography", "documentary", "family", "true story", "inspirational"],
+    "disappointment": ["redemption", "drama", "comedy", "uplifting"],
+    "nervousness": ["comedy", "romantic", "light-hearted", "slice of life"],
+    "optimism": ["adventure", "fantasy", "animated", "science fiction", "feel-good"]
+}
+
+class EmotionRequest(BaseModel):
+    text: str
+    discover: List[Movie]
+@app.post("/emotion-recommend")
+def emotion_recommend(req: EmotionRequest):
+    # Detectează emoția principală
+    results = emotion_classifier(req.text)
+    sorted_scores = sorted(results[0], key=lambda x: x["score"], reverse=True)
+    top_emotion = sorted_scores[0]["label"].lower()
+
+    # Genuri emoționale asociate
+    related_genres = set(EMOTION_GENRE_MAP.get(top_emotion, []))
+
+    # Creează DataFrame
+    discover_df = pd.DataFrame([movie.dict() for movie in req.discover])
+    discover_df["release_year"] = pd.to_datetime(discover_df["release_date"], errors='coerce').dt.year
+
+    # Combină câmpurile în taguri
+    def build_combined_tags(row):
+        return f"{row['title']} {row['tags']} {row['type']} {row['release_year']}"
+
+    discover_df["combined_tags"] = discover_df.apply(build_combined_tags, axis=1).fillna("")
+    discover_df["combined_tags"] = discover_df["combined_tags"].apply(stem)
+
+    # Similaritate semantică între input și filme
+    input_embedding = embedding_model.encode([req.text], convert_to_numpy=True)
+    movie_embeddings = embedding_model.encode(discover_df["combined_tags"].tolist(), convert_to_numpy=True)
+    semantic_sim = cosine_similarity(input_embedding, movie_embeddings).flatten()
+
+    # Bonus pe genuri emoționale
+    discover_df["genre_match"] = discover_df["tags"].apply(
+        lambda t: len(related_genres.intersection(extract_genres(t)))
+    )
+    genre_bonus = normalize(discover_df["genre_match"])
+
+    # Bonus pe scor vot și an
+    discover_df["vote_bonus"] = normalize(discover_df["vote_average"])
+    discover_df["year_bonus"] = normalize(discover_df["release_year"].fillna(0))
+
+    final_score = (
+        0.6 * semantic_sim +
+        0.2 * genre_bonus +
+        0.1 * discover_df["vote_bonus"] +
+        0.1 * discover_df["year_bonus"]
+    )
+
+    discover_df["final_score"] = final_score
+
+    # Elimină duplicate
+    seen = set()
+    ranked = []
+    for _, row in discover_df.sort_values(by="final_score", ascending=False).iterrows():
+        key = (row["id"], row["type"])
+        if key not in seen:
+            ranked.append(row.to_dict())
+            seen.add(key)
+        if len(ranked) >= 10:
+            break
+
+    return {
+        "emotion": top_emotion,
+        "recommended": ranked
     }
 
