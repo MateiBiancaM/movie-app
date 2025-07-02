@@ -10,16 +10,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from collections import Counter
 from sentence_transformers import SentenceTransformer
 from transformers import pipeline
+from typing import Optional 
 
-
+# Inițializări
 nltk.download("punkt")
 ps = PorterStemmer()
-# Încarcă modelul
 embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+emotion_classifier = pipeline("text-classification", model="j-hartmann/emotion-english-distilroberta-base", return_all_scores=True)
 
 app = FastAPI()
 
-# CORS-acces din frontend
+# CORS pentru acces frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -28,27 +29,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Funcție de stemming
+# Stemming
 def stem(text):
     return " ".join([ps.stem(word) for word in text.split()])
 
-class Movie(BaseModel):
-    id: int
-    title: str
-    tags: str
-    poster_path: str
-    release_date: str
-    vote_average: float
-    type: str 
-
-class RecommendRequest(BaseModel):
-    favorites: List[Movie]
-    discover: List[Movie]
-
-@app.get("/")
-def root():
-    return {"message": "Success!"}
-
+# Genuri definite
 GENRES = {
     "action", "adventure", "animation", "comedy", "crime", "documentary",
     "drama", "family", "fantasy", "history", "horror", "music", "mystery",
@@ -61,40 +46,55 @@ def extract_genres(text):
 def normalize(series):
     return (series - series.min()) / (series.max() - series.min() + 1e-6)
 
+# Modele
+class Movie(BaseModel):
+    id: int
+    title: str
+    tags: str
+    poster_path: str
+    release_date: str
+    vote_average: float
+    type: str
+
+class RecommendRequest(BaseModel):
+    favorites: List[Movie]
+    discover: List[Movie]
+
+class EmotionRequest(BaseModel):
+    text: str
+    discover: List[Movie]
+
+@app.get("/")
+def root():
+    return {"message": "Success!"}
+
 @app.post("/recommend")
 def recommend(request: RecommendRequest):
     discover_df = pd.DataFrame([movie.dict() for movie in request.discover])
     favorites_df = pd.DataFrame([movie.dict() for movie in request.favorites])
 
-    # Procesare release_date -> year
     discover_df["release_year"] = pd.to_datetime(discover_df["release_date"], errors='coerce').dt.year
     favorites_df["release_year"] = pd.to_datetime(favorites_df["release_date"], errors='coerce').dt.year
 
-    # Construim combined_tags
     def build_combined_tags(row):
         return f"{row['title']} {row['tags']} {row['type']} {row['release_year']}"
 
     discover_df["combined_tags"] = discover_df.apply(build_combined_tags, axis=1).fillna("")
     favorites_df["combined_tags"] = favorites_df.apply(build_combined_tags, axis=1).fillna("")
 
-    # Stemming
     discover_df["combined_tags"] = discover_df["combined_tags"].apply(stem)
     favorites_df["combined_tags"] = favorites_df["combined_tags"].apply(stem)
 
-    # Obține textele (cu stemming deja aplicat)
     discover_texts = discover_df["combined_tags"].tolist()
     favorites_texts = favorites_df["combined_tags"].tolist()
 
-    # Concatenează pentru embedding consistent
     all_texts = discover_texts + favorites_texts
     all_embeddings = embedding_model.encode(all_texts, convert_to_numpy=True)
 
-    # Separă vectorii
     discover_vectors = all_embeddings[:len(discover_texts)]
     favorite_vectors = all_embeddings[len(discover_texts):]
     user_profile = np.mean(favorite_vectors, axis=0).reshape(1, -1)
 
-    # Similaritate + bonusuri
     similarity_general = cosine_similarity(user_profile, discover_vectors).flatten()
 
     most_common_type = Counter(favorites_df["type"]).most_common(1)[0][0]
@@ -102,7 +102,6 @@ def recommend(request: RecommendRequest):
     discover_df["vote_bonus"] = normalize(discover_df["vote_average"])
     discover_df["year_bonus"] = normalize(discover_df["release_year"].fillna(0))
 
-    # Genuri favorite
     fav_genres = favorites_df["tags"].apply(extract_genres)
     all_fav_genres = set.union(*fav_genres) if not fav_genres.empty else set()
     discover_df["genre_match"] = discover_df["tags"].apply(
@@ -138,7 +137,7 @@ def recommend(request: RecommendRequest):
         if len(general_recommendations) >= 20:
             break
 
-    # Recomandări individuale (cu accent puternic pe gen)
+    # Individual
     individual_recommendations = []
     used_individual_ids = set()
 
@@ -187,57 +186,86 @@ def recommend(request: RecommendRequest):
         "individual": individual_recommendations
     }
 
-#Recomandari pe baza de emotii
-emotion_classifier = pipeline("text-classification", model="j-hartmann/emotion-english-distilroberta-base", return_all_scores=True)
+# ----------------------------
+# EMOTION-BASED RECOMMENDATION
+# ----------------------------
+
 EMOTION_GENRE_MAP = {
-    "joy": ["feel-good", "romantic comedy", "animation", "family", "music"],
-    "sadness": ["uplifting", "drama", "inspirational", "comedy", "romance"],
-    "anger": ["revenge", "action", "thriller", "justice", "crime"],
-    "fear": ["horror", "thriller", "suspense", "survival", "mystery"],
-    "surprise": ["plot twist", "mystery", "sci-fi", "fantasy"],
-    "love": ["romance", "drama", "romantic comedy", "musical"],
-    "gratitude": ["biography", "documentary", "family", "true story", "inspirational"],
-    "disappointment": ["redemption", "drama", "comedy", "uplifting"],
-    "nervousness": ["comedy", "romantic", "light-hearted", "slice of life"],
-    "optimism": ["adventure", "fantasy", "animated", "science fiction", "feel-good"]
+    "joy": ["animation", "family", "comedy"],
+    "sadness": ["drama", "comedy", "romance"],
+    "anger": ["action", "thriller", "crime"],
+    "fear": ["horror", "thriller", "mystery"],
+    "surprise": ["mystery", "science fiction", "fantasy"],
+    "love": ["romance", "drama", "comedy"],
+    "gratitude": ["documentary", "family", "history"],
+    "disappointment": ["drama", "comedy"],
+    "nervousness": ["comedy", "romance"],
+    "optimism": ["adventure", "fantasy", "animation", "science fiction"]
 }
 
-class EmotionRequest(BaseModel):
-    text: str
-    discover: List[Movie]
+def manual_emotion_override(text: str) -> Optional[str]: 
+    lowered = text.lower()
+    override_map = {
+        "love": ["love", "in love", "romantic", "falling for", "soulmate", "valentine"],
+        "gratitude": ["grateful", "thankful", "appreciate", "blessed"],
+        "fear": ["scared", "terrified", "panic", "afraid", "frightened"],
+        "anger": ["angry", "furious", "rage", "mad"],
+        "sadness": ["sad", "cry", "heartbroken", "depressed"],
+        "joy": ["happy", "excited", "delighted", "cheerful"],
+        "disappointment": ["disappointed", "regret", "let down"],
+        "nervousness": ["nervous", "anxious", "worried", "stressed"],
+        "optimism": ["hopeful", "positive", "looking forward"]
+    }
+    for emotion, keywords in override_map.items():
+        if any(word in lowered for word in keywords):
+            return emotion
+    return None
+
+@app.post("/emotion-recommend")
 @app.post("/emotion-recommend")
 def emotion_recommend(req: EmotionRequest):
-    # Detectează emoția principală
-    results = emotion_classifier(req.text)
-    sorted_scores = sorted(results[0], key=lambda x: x["score"], reverse=True)
-    top_emotion = sorted_scores[0]["label"].lower()
+    text_lower = req.text.lower()
 
-    # Genuri emoționale asociate
-    related_genres = set(EMOTION_GENRE_MAP.get(top_emotion, []))
+    # 1️⃣ Căutăm genuri din text
+    detected_genres = set(
+        g for g in GENRES if g in text_lower
+    )
 
-    # Creează DataFrame
+    if detected_genres:
+        # ✅ Dacă textul conține genuri, folosim doar acestea
+        related_genres = detected_genres
+        top_emotion = "custom genre"
+    else:
+        # 2️⃣ Emoție override
+        manual_emotion = manual_emotion_override(req.text)
+
+        if manual_emotion:
+            top_emotion = manual_emotion
+        else:
+            results = emotion_classifier(req.text)
+            sorted_scores = sorted(results[0], key=lambda x: x["score"], reverse=True)
+            top_emotion = sorted_scores[0]["label"].lower()
+
+        related_genres = set(EMOTION_GENRE_MAP.get(top_emotion, []))
+
+    # Procesare filme
     discover_df = pd.DataFrame([movie.dict() for movie in req.discover])
     discover_df["release_year"] = pd.to_datetime(discover_df["release_date"], errors='coerce').dt.year
 
-    # Combină câmpurile în taguri
     def build_combined_tags(row):
         return f"{row['title']} {row['tags']} {row['type']} {row['release_year']}"
 
     discover_df["combined_tags"] = discover_df.apply(build_combined_tags, axis=1).fillna("")
     discover_df["combined_tags"] = discover_df["combined_tags"].apply(stem)
 
-    # Similaritate semantică între input și filme
     input_embedding = embedding_model.encode([req.text], convert_to_numpy=True)
     movie_embeddings = embedding_model.encode(discover_df["combined_tags"].tolist(), convert_to_numpy=True)
     semantic_sim = cosine_similarity(input_embedding, movie_embeddings).flatten()
 
-    # Bonus pe genuri emoționale
     discover_df["genre_match"] = discover_df["tags"].apply(
         lambda t: len(related_genres.intersection(extract_genres(t)))
     )
     genre_bonus = normalize(discover_df["genre_match"])
-
-    # Bonus pe scor vot și an
     discover_df["vote_bonus"] = normalize(discover_df["vote_average"])
     discover_df["year_bonus"] = normalize(discover_df["release_year"].fillna(0))
 
@@ -247,10 +275,8 @@ def emotion_recommend(req: EmotionRequest):
         0.1 * discover_df["vote_bonus"] +
         0.1 * discover_df["year_bonus"]
     )
-
     discover_df["final_score"] = final_score
 
-    # Elimină duplicate
     seen = set()
     ranked = []
     for _, row in discover_df.sort_values(by="final_score", ascending=False).iterrows():
@@ -265,4 +291,3 @@ def emotion_recommend(req: EmotionRequest):
         "emotion": top_emotion,
         "recommended": ranked
     }
-

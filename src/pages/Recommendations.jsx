@@ -22,6 +22,64 @@ import {
 import axios from "axios";
 import CardComponent from "../components/CardComponent";
 
+const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+
+const fetchCreditsWithCache = async (type, id) => {
+  const cacheKey = `credits-${type}-${id}`;
+  const cached = localStorage.getItem(cacheKey);
+
+  if (cached) {
+    return JSON.parse(cached);
+  }
+
+  const credits = await fetchCredits(type, id);
+  localStorage.setItem(cacheKey, JSON.stringify(credits));
+  await sleep(250);
+  return credits;
+};
+
+const buildDiscoverPool = async () => {
+  const genreMap = await getGenreMap();
+  const [moviesRes, seriesRes] = await Promise.all([
+    fetchMoviesBulk(6),
+    fetchTvSeriesBulk(6),
+  ]);
+
+  const discoverItems = [...moviesRes.results, ...seriesRes.results];
+  const discoverWithTags = [];
+
+  for (const item of discoverItems) {
+    const type = item.media_type || (item.name ? "tv" : "movie");
+    const credits = await fetchCreditsWithCache(type, item.id);
+    const tags = [
+      ...(item.overview?.split(" ") || []),
+      ...(item.genre_ids?.map((id) => genreMap[id]?.toLowerCase()) || []),
+      ...(credits.cast?.slice(0, 3).map((a) => a.name) || []),
+      ...(credits.crew?.filter((p) => p.job === "Director").map((p) => p.job + " " + p.name) || []),
+    ].join(" ");
+
+    discoverWithTags.push({
+      id: item.id,
+      title: item.title || item.name,
+      tags,
+      poster_path: item.poster_path,
+      release_date: item.release_date || item.first_air_date,
+      vote_average: item.vote_average,
+      type,
+    });
+  }
+
+  return discoverWithTags.filter(
+    (m) =>
+      m.id &&
+      m.title &&
+      m.tags &&
+      m.poster_path &&
+      m.release_date &&
+      typeof m.vote_average === "number"
+  );
+};
+
 const Recommendations = () => {
   const { getWatched } = useFirestore();
   const { user } = useAuth();
@@ -30,7 +88,6 @@ const Recommendations = () => {
   const [filter, setFilter] = useState("general");
   const [general, setGeneral] = useState([]);
   const [individual, setIndividual] = useState([]);
-
   const [emotionInput, setEmotionInput] = useState("");
   const [emotionResults, setEmotionResults] = useState([]);
   const [emotion, setEmotion] = useState("");
@@ -39,9 +96,22 @@ const Recommendations = () => {
     const loadRecommendations = async () => {
       if (!user?.uid) return;
 
+      const cached = localStorage.getItem("cached-recommendations");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        const age = Date.now() - parsed.timestamp;
+        const maxAge = 1000 * 60 * 30;
+
+        if (age < maxAge) {
+          setGeneral(parsed.general);
+          setIndividual(parsed.individual);
+          setIsLoading(false);
+          return;
+        }
+      }
+
       try {
         setIsLoading(true);
-
         const genreMap = await getGenreMap();
         if (Object.keys(genreMap).length === 0) return;
 
@@ -51,82 +121,42 @@ const Recommendations = () => {
           .sort((a, b) => new Date(b.watchDate) - new Date(a.watchDate))
           .slice(0, 5);
 
-        const favoritesWithTags = await Promise.all(
-          favorites.map(async (item) => {
-            const credits = await fetchCredits(item.type, item.id);
-            const tags = [
-              ...(item.description?.split(" ") || []),
-              ...(item.genres?.map((g) => g.toLowerCase()) || []),
-              ...(credits.cast?.slice(0, 3).map((a) => a.name) || []),
-              ...(credits.crew?.filter(p => p.job === "Director").map((p) => p.job + " " + p.name) || []),
-            ].join(" ");
+        const favoritesWithTags = [];
+        for (const item of favorites) {
+          const credits = await fetchCreditsWithCache(item.type, item.id);
+          const tags = [
+            ...(item.description?.split(" ") || []),
+            ...(item.genres?.map((g) => g.toLowerCase()) || []),
+            ...(credits.cast?.slice(0, 3).map((a) => a.name) || []),
+            ...(credits.crew?.filter((p) => p.job === "Director").map((p) => p.job + " " + p.name) || []),
+          ].join(" ");
 
-            return {
-              id: item.id,
-              title: item.title || item.name,
-              tags,
-              poster_path: item.poster_path,
-              release_date: item.release_date || item.first_air_date,
-              vote_average: item.vote_average,
-              type: item.type || (item.name ? "tv" : "movie")
-            };
-          })
-        );
+          favoritesWithTags.push({
+            id: item.id,
+            title: item.title || item.name,
+            tags,
+            poster_path: item.poster_path,
+            release_date: item.release_date || item.first_air_date,
+            vote_average: item.vote_average,
+            type: item.type || (item.name ? "tv" : "movie"),
+          });
+        }
 
-        const [moviesRes, seriesRes] = await Promise.all([
-          fetchMoviesBulk(6),
-          fetchTvSeriesBulk(6),
-        ]);
-
-        const discoverItems = [...moviesRes.results, ...seriesRes.results];
-
-        const discoverWithTags = await Promise.all(
-          discoverItems.map(async (item) => {
-            const type = item.media_type || (item.name ? "tv" : "movie");
-            const credits = await fetchCredits(type, item.id);
-            const tags = [
-              ...(item.overview?.split(" ") || []),
-              ...(item.genre_ids?.map((id) => genreMap[id]?.toLowerCase()) || []),
-              ...(credits.cast?.slice(0, 3).map((a) => a.name) || []),
-              ...(credits.crew?.filter(p => p.job === "Director").map((p) => p.job + " " + p.name) || []),
-            ].join(" ");
-
-            return {
-              id: item.id,
-              title: item.title || item.name,
-              tags,
-              poster_path: item.poster_path,
-              release_date: item.release_date || item.first_air_date,
-              vote_average: item.vote_average,
-              type: item.type || (item.name ? "tv" : "movie")
-            };
-          })
-        );
-
-        const cleanedFavorites = favoritesWithTags.filter(
-          (m) =>
-            m.id &&
-            m.title &&
-            m.tags &&
-            m.poster_path &&
-            m.release_date &&
-            typeof m.vote_average === "number"
-        );
-
-        const cleanedDiscover = discoverWithTags.filter(
-          (m) =>
-            m.id &&
-            m.title &&
-            m.tags &&
-            m.poster_path &&
-            m.release_date &&
-            typeof m.vote_average === "number"
-        );
+        const discoverWithTags = await buildDiscoverPool();
 
         const res = await axios.post("http://localhost:8001/recommend", {
-          favorites: cleanedFavorites,
-          discover: cleanedDiscover,
+          favorites: favoritesWithTags,
+          discover: discoverWithTags,
         });
+
+        localStorage.setItem(
+          "cached-recommendations",
+          JSON.stringify({
+            general: res.data.general,
+            individual: res.data.individual,
+            timestamp: Date.now(),
+          })
+        );
 
         setGeneral(res.data.general);
         setIndividual(res.data.individual);
@@ -144,25 +174,27 @@ const Recommendations = () => {
     if (!emotionInput.trim()) return;
     setIsLoading(true);
     setEmotionResults([]);
+
     try {
-     const res = await axios.post("http://localhost:8001/emotion-recommend", {
-  text: emotionInput,
-  discover: general.concat(...individual.flatMap((i) => i.suggestions)),
-});
+      const freshDiscover = await buildDiscoverPool();
 
-// Elimină duplicatele pe bază de id + type
-const uniqueResults = [];
-const seenKeys = new Set();
-for (const item of res.data.recommended) {
-  const key = `${item.id}-${item.type}`;
-  if (!seenKeys.has(key)) {
-    seenKeys.add(key);
-    uniqueResults.push(item);
-  }
-}
+      const res = await axios.post("http://localhost:8001/emotion-recommend", {
+        text: emotionInput,
+        discover: freshDiscover,
+      });
 
-setEmotion(res.data.emotion);
-setEmotionResults(uniqueResults);
+      const uniqueResults = [];
+      const seenKeys = new Set();
+      for (const item of res.data.recommended) {
+        const key = `${item.id}-${item.type}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          uniqueResults.push(item);
+        }
+      }
+
+      setEmotion(res.data.emotion);
+      setEmotionResults(uniqueResults);
     } catch (err) {
       console.error("Eroare recomandări emoționale:", err);
     } finally {
@@ -176,11 +208,7 @@ setEmotionResults(uniqueResults);
         <Heading as="h2" fontSize="md" textTransform="uppercase">
           Recommendations
         </Heading>
-        <Select
-          w="270px"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        >
+        <Select w="270px" value={filter} onChange={(e) => setFilter(e.target.value)}>
           <option value="general">General Recommendations</option>
           <option value="individual">Individual Recommendations</option>
           <option value="emotion">Emotion-Based Recommendations</option>
