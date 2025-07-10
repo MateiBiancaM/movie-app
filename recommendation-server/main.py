@@ -222,7 +222,6 @@ def manual_emotion_override(text: str) -> Optional[str]:
     return None
 
 @app.post("/emotion-recommend")
-@app.post("/emotion-recommend")
 def emotion_recommend(req: EmotionRequest):
     text_lower = req.text.lower()
 

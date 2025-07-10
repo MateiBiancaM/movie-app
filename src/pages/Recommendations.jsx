@@ -22,20 +22,28 @@ import {
 import axios from "axios";
 import CardComponent from "../components/CardComponent";
 
+// mini-pauză doar dacă e nevoie
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
+// cache doar cu date esențiale în sessionStorage
 const fetchCreditsWithCache = async (type, id) => {
   const cacheKey = `credits-${type}-${id}`;
-  const cached = localStorage.getItem(cacheKey);
+  const cached = sessionStorage.getItem(cacheKey);
+  if (cached) return JSON.parse(cached);
 
-  if (cached) {
-    return JSON.parse(cached);
+  const { cast, crew } = await fetchCredits(type, id);
+  const minimal = {
+    cast: cast?.slice(0, 3),
+    crew: crew?.filter((p) => p.job === "Director"),
+  };
+
+  try {
+    sessionStorage.setItem(cacheKey, JSON.stringify(minimal));
+  } catch (e) {
+    console.warn("⚠️ sessionStorage full – skipping cache for:", cacheKey);
   }
 
-  const credits = await fetchCredits(type, id);
-  localStorage.setItem(cacheKey, JSON.stringify(credits));
-  await sleep(250);
-  return credits;
+  return minimal;
 };
 
 const buildDiscoverPool = async () => {
@@ -54,8 +62,8 @@ const buildDiscoverPool = async () => {
     const tags = [
       ...(item.overview?.split(" ") || []),
       ...(item.genre_ids?.map((id) => genreMap[id]?.toLowerCase()) || []),
-      ...(credits.cast?.slice(0, 3).map((a) => a.name) || []),
-      ...(credits.crew?.filter((p) => p.job === "Director").map((p) => p.job + " " + p.name) || []),
+      ...(credits.cast?.map((a) => a.name) || []),
+      ...(credits.crew?.map((p) => p.job + " " + p.name) || []),
     ].join(" ");
 
     discoverWithTags.push({
@@ -127,8 +135,8 @@ const Recommendations = () => {
           const tags = [
             ...(item.description?.split(" ") || []),
             ...(item.genres?.map((g) => g.toLowerCase()) || []),
-            ...(credits.cast?.slice(0, 3).map((a) => a.name) || []),
-            ...(credits.crew?.filter((p) => p.job === "Director").map((p) => p.job + " " + p.name) || []),
+            ...(credits.cast?.map((a) => a.name) || []),
+            ...(credits.crew?.map((p) => p.job + " " + p.name) || []),
           ].join(" ");
 
           favoritesWithTags.push({
